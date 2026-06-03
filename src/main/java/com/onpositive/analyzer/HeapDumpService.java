@@ -1,5 +1,11 @@
 package com.onpositive.analyzer;
 
+import com.onpositive.analyzer.search.Bm25Index;
+import com.onpositive.analyzer.search.Bm25Result;
+import com.onpositive.analyzer.search.ClassNameTokenizer;
+import com.onpositive.analyzer.search.DefaultClassSkippedPredicate;
+import com.onpositive.analyzer.search.HeapDumpBm25Indexer;
+import com.onpositive.analyzer.search.InMemoryBm25Index;
 import com.onpositive.analyzer.util.LRUCache;
 import org.netbeans.lib.profiler.heap.*;
 import org.netbeans.lib.profiler.utils.StringUtils;
@@ -21,6 +27,9 @@ public class HeapDumpService {
     private List<ClassStats> classesSortedByCount;
     private List<ClassStats> classesSortedBySize;
     private LRUCache<String, List<JavaClass>> classesByRegexp = new LRUCache<>(10);
+
+    private Bm25Index bm25Index;
+    private LRUCache<String, List<Bm25Result>> bm25SearchCache = new LRUCache<>(20);
 
     public static class ClassStats {
         public String className;
@@ -342,5 +351,46 @@ public class HeapDumpService {
             }
         }
         return query;
+    }
+
+    private void buildBm25Index() {
+        if (heap == null) {
+            throw new IllegalStateException("Heap not loaded");
+        }
+        InMemoryBm25Index index = new InMemoryBm25Index();
+        HeapDumpBm25Indexer indexer = new HeapDumpBm25Indexer(
+                index, new DefaultClassSkippedPredicate(), new ClassNameTokenizer());
+        indexer.buildIndex(heap);
+        this.bm25Index = index;
+    }
+
+    public List<Bm25Result> searchClassesBm25(String query, int topN, int from) {
+        if (heap == null) {
+            throw new IllegalStateException("Heap not loaded");
+        }
+        if (bm25Index == null) {
+            buildBm25Index();
+        }
+
+        String cacheKey = query + "|" + topN;
+        List<Bm25Result> fullResults = bm25SearchCache.get(cacheKey);
+        if (fullResults == null) {
+            fullResults = bm25Index.search(query, Math.max(topN + from, topN));
+            for (Bm25Result result : fullResults) {
+                try {
+                    JavaClass jc = heap.getJavaClassByName(result.className());
+                    if (jc != null) {
+                        result.setInstanceCount(jc.getInstancesCount());
+                        result.setTotalSize(jc.getAllInstancesSize());
+                    }
+                } catch (RuntimeException ignored) {
+                }
+            }
+            bm25SearchCache.put(cacheKey, fullResults);
+        }
+
+        int safeFrom = Math.min(from, fullResults.size());
+        int safeTo = Math.min(safeFrom + topN, fullResults.size());
+        return fullResults.subList(safeFrom, safeTo);
     }
 }

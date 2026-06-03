@@ -1,8 +1,10 @@
 package com.onpositive.analyzer.mcp.reflection;
 
-import io.modelcontextprotocol.server.McpServerFeatures;
+import com.onpositive.analyzer.printing.IValuePrinter;
+import com.onpositive.analyzer.printing.ValuePrintersRegistry;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -68,23 +70,62 @@ public class ToolsFactory {
                 null
         );
 
+        IValuePrinter printer = getValuePrinter(method);
+
         return new SyncToolSpecification(tool, (exchange, request) -> {
             try {
                 Map<String, Object> args = request.arguments();
                 Object[] methodArgs = prepareMethodArgs(method, paramAnnotations, paramTypes, args);
                 Object result = method.invoke(toolsService, methodArgs);
-
-                String resultStr = result != null ? result.toString() : "null";
+                
+                if (result == null) {
+                    return errorResult("Result is null");
+                }
+                
+                String resultStr = "";
+                if (printer == IValuePrinter.DEFAULT) {
+                    IValuePrinter valuePrinter = ValuePrintersRegistry.getInstance().getPrinter(result.getClass());
+                    if (valuePrinter != null) {
+                        resultStr = valuePrinter.print(result);
+                    }
+                }
+                if (resultStr.isEmpty()) {
+                    resultStr = printer.print(result);
+                }
                 return McpSchema.CallToolResult.builder()
                         .content(List.of(new McpSchema.TextContent(resultStr)))
                         .isError(false)
                         .build();
             } catch (IllegalArgumentException e) {
                 return errorResult("Invalid arguments: " + e.getMessage());
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                String message = cause != null ? cause.getMessage() : e.getMessage();
+                if (message == null || message.isEmpty()) {
+                    message = cause != null ? cause.getClass().getSimpleName() : "Unknown error";
+                }
+                return errorResult("Error executing tool: " + message);
             } catch (Exception e) {
-                return errorResult("Error executing tool: " + e.getMessage());
+                String message = e.getMessage();
+                if (message == null || message.isEmpty()) {
+                    message = e.getClass().getSimpleName();
+                }
+                return errorResult("Error executing tool: " + message);
             }
         });
+    }
+
+    private static IValuePrinter getValuePrinter(Method method) {
+        Printer annotation = method.getAnnotation(Printer.class);
+        if (annotation != null) {
+            Class<? extends IValuePrinter> printerClass = annotation.impl();
+            try {
+                return printerClass.newInstance();
+            } catch (InstantiationException | IllegalAccessException e) {
+                LoggerFactory.getLogger(ToolsFactory.class).error("Error creating object printer. Don't have proper constructor?", e);
+            }
+        }
+        return IValuePrinter.DEFAULT;
     }
 
     private static class ParamInfo {

@@ -6,7 +6,7 @@
 
     <groupId>com.onpositive</groupId>
     <artifactId>heap_mcp_nb</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.0.1</version>
 
     <dependencies>
         <!-- MCP Java SDK -->
@@ -14,7 +14,7 @@
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp</artifactId>
-            <version>1.0.0</version>
+            <version>1.1.2</version>
             <scope>compile</scope>
         </dependency>
 
@@ -36,6 +36,13 @@
             <groupId>org.openjdk.nashorn</groupId>
             <artifactId>nashorn-core</artifactId>
             <version>15.4</version>
+        </dependency>
+
+        <!-- HPPC – High Performance Primitive Collections for memory-efficient index structures -->
+        <dependency>
+            <groupId>com.carrotsearch</groupId>
+            <artifactId>hppc</artifactId>
+            <version>0.9.1</version>
         </dependency>
 
         <!-- SLF4J for logging (required by SDK) -->

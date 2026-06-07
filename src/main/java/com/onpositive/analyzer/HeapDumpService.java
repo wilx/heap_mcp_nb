@@ -1,5 +1,6 @@
 package com.onpositive.analyzer;
 
+import com.onpositive.analyzer.printing.InstancePrinter;
 import com.onpositive.analyzer.search.Bm25Index;
 import com.onpositive.analyzer.search.Bm25Result;
 import com.onpositive.analyzer.search.ClassNameTokenizer;
@@ -19,6 +20,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
+
+import static com.onpositive.analyzer.util.ClassUtil.getClassName;
 
 public class HeapDumpService {
 
@@ -128,64 +131,6 @@ public class HeapDumpService {
         return result;
     }
 
-    private static String getClassName(Instance inst) {
-        if (inst.getJavaClass() == null || inst.getJavaClass().getName() == null) {
-            return "";
-        }
-        String name = inst.getJavaClass().getName();
-        if (name.equals("java.lang.Class")) {
-            Object clzName = inst.getValueOfField("name");
-            if (clzName != null) {
-                return name + "<" + clzName + ">";
-            }
-        }
-        return name;
-    }
-
-    private static String extractStringValue(Instance stringInstance) {
-        Object valueField = stringInstance.getValueOfField("value");
-        if (valueField == null) return "null";
-
-        if (valueField instanceof PrimitiveArrayInstance array) {
-            String typeName = array.getJavaClass().getName();
-            List values = array.getValues();
-            if (values == null) return "null";
-
-            if ("char[]".equals(typeName)) {
-                StringBuilder sb = new StringBuilder(values.size());
-                for (Object v : values) {
-                    if (v != null) {
-                        if (v instanceof Character) {
-                            sb.append((char) v);
-                        } else {
-                            sb.append(v.toString());
-                        }
-                    } else {
-                        sb.append('?');
-                    }
-                }
-                return sb.toString();
-            } else if ("byte[]".equals(typeName)) {
-                byte[] bytes = new byte[values.size()];
-                for (int i = 0; i < values.size(); i++) {
-                    bytes[i] = ((Number) values.get(i)).byteValue();
-                }
-                Object coder = stringInstance.getValueOfField("coder");
-                int coderValue = (coder instanceof Number) ? ((Number) coder).intValue() : 0;
-                if (coderValue == 1) {
-                    StringBuilder sb = new StringBuilder(bytes.length / 2);
-                    for (int i = 0; i < bytes.length - 1; i += 2) {
-                        char c = (char) (((bytes[i] & 0xFF) << 8) | (bytes[i + 1] & 0xFF));
-                        sb.append(c);
-                    }
-                    return sb.toString();
-                } else {
-                    return new String(bytes, StandardCharsets.ISO_8859_1);
-                }
-            }
-        }
-        return String.valueOf(valueField);
-    }
 
     public JavaClass getJavaClassByName(String name) {
         if (heap == null) throw new IllegalStateException("Heap not loaded");
@@ -357,6 +302,7 @@ public class HeapDumpService {
 //        String convertedQuery = convertToNetBeansOql(query);
         
         StringBuilder resultBuilder = new StringBuilder();
+        InstancePrinter printer = new InstancePrinter();
 
         oqlEngine.executeQuery(query, new OQLEngine.ObjectVisitor() {
             int count = 0;
@@ -367,38 +313,17 @@ public class HeapDumpService {
                 if (count > maxResults) {
                     return false;
                 }
-                
-                if (o instanceof PrimitiveArrayInstance arrayInstance) {
-                    resultBuilder.append("Array:").append(getClassName(arrayInstance)).append(" values:[");
-                    int to = Math.min(100, arrayInstance.getLength());
-                    List values = arrayInstance.getValues();
-                    for (int i = 0; i < to; i++) {
-                        resultBuilder.append(values.get(i).toString());
-                        if (i < to - 1) {
-                            resultBuilder.append(",");
-                        }
-                    }
-                    resultBuilder.append("]\n");
-                } else if (o instanceof Instance) {
-                    Instance inst = (Instance) o;
-                    String className = inst.getJavaClass().getName();
-                    if ("java.lang.String".equals(className)) {
-                        resultBuilder.append(String.format("[%d] \"%s\"\n", count, extractStringValue(inst)));
-                    } else {
-                        resultBuilder.append(String.format("[%d] %s (ID: 0x%x, Size: %d)\n",
-                                count,
-                                className,
-                                inst.getInstanceId(),
-                                inst.getSize()));
-                    }
+
+                if (o instanceof Instance) {
+                    resultBuilder.append(String.format("[%d] \"%s\"\n", count, printer.print(o)));
                 } else if (o != null) {
-                    resultBuilder.append(String.format("[%d] %s\n", count, o.toString()));
+                    resultBuilder.append(String.format("[%d] %s\n", count, o));
                 }
                 return true;
             }
         });
 
-        if (resultBuilder.length() == 0) {
+        if (resultBuilder.isEmpty()) {
             return "No results found or empty result set.";
         }
 

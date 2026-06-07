@@ -216,7 +216,7 @@ public class HeapDumpMcpTest {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
         toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
         
-        McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "SELECT f FROM javax.swing.JFrame f", "max_results", 10));
+        McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select f from javax.swing.JFrame f", "max_results", 10));
         McpSchema.CallToolResult result = toolsGetter.executeOqlTool().callHandler().apply(null, request);
         String content = ((McpSchema.TextContent) result.content().get(0)).text();
         System.out.println("OQL Result: " + content);

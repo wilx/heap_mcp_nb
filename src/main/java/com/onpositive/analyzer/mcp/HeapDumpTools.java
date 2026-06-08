@@ -82,23 +82,37 @@ public class HeapDumpTools {
 
     @Tool(name = "get_class_by_id", title = "Get Class By ID", decription = "Returns class details by its internal ID.")
     @Printer(impl = JavaClassPrinterWrapper.class)
-    public JavaClass getJavaClassById(@Required("id") long id) {
-        return heapDumpService.getJavaClassById(id);
+    public JavaClass getJavaClassById(@Required("id") String id) {
+        return heapDumpService.getJavaClassById(parseId(id));
     }
 
     @Tool(name = "get_instance_by_id", title = "Get Instance By ID", decription = "Returns instance details by its internal ID, including class, size, retained size, and field values.")
     @Printer(impl = InstanceInfoPrinter.class)
-    public HeapDumpService.InstanceInfo getInstanceById(@Required("id") long id) {
-        return heapDumpService.getInstanceById(id);
+    public HeapDumpService.InstanceInfo getInstanceById(@Required("id") String id) {
+        return heapDumpService.getInstanceById(parseId(id));
     }
 
     @Tool(name = "get_all_references", title = "Get All References", decription = "Returns all references to an instance by its ID with pagination.")
     @Printer(impl = ReferenceInfoListPrinter.class)
     public List<HeapDumpService.ReferenceInfo> getAllReferences(
-            @Required("id") long id,
+            @Required("id") String id,
             @Default(name = "from", value = "0") int from,
             @Default(name = "to", value = "50") int to) {
-        return heapDumpService.getAllReferences(id, from, to);
+        return heapDumpService.getAllReferences(parseId(id), from, to);
+    }
+
+    private static long parseId(String id) {
+        if (id == null || id.trim().isEmpty()) return 0L;
+        id = id.trim();
+        try {
+            return Long.decode(id);
+        } catch (NumberFormatException e1) {
+            try {
+                return Long.parseLong(id, 16);
+            } catch (NumberFormatException e2) {
+                throw new IllegalArgumentException("Cannot parse ID: " + id);
+            }
+        }
     }
 
     @Tool(name = "get_classes_by_regexp", title = "Get Classes By RegExp", decription = "Returns classes matching the regular expression with pagination.")

@@ -2,6 +2,7 @@ package com.onpositive.analyzer.mcp.reflection;
 
 import com.onpositive.analyzer.printing.IValuePrinter;
 import com.onpositive.analyzer.printing.ValuePrintersRegistry;
+import com.onpositive.analyzer.mcp.FileLogger;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 public class ToolsFactory {
+
+    private static final FileLogger FILE_LOGGER = new FileLogger();
 
     public static List<SyncToolSpecification> createToolSpecs(Object toolsService) {
         List<SyncToolSpecification> specs = new ArrayList<>();
@@ -73,13 +76,18 @@ public class ToolsFactory {
         IValuePrinter printer = getValuePrinter(method);
 
         return new SyncToolSpecification(tool, (exchange, request) -> {
+            String toolName = toolAnnotation.name();
+            String argsStr = request.arguments() != null ? request.arguments().toString() : "{}";
+            FILE_LOGGER.logToolCall(toolName, argsStr);
             try {
                 Map<String, Object> args = request.arguments();
                 Object[] methodArgs = prepareMethodArgs(method, paramAnnotations, paramTypes, args);
                 Object result = method.invoke(toolsService, methodArgs);
                 
                 if (result == null) {
-                    return errorResult("Result is null");
+                    McpSchema.CallToolResult err = errorResult("Result is null");
+                    FILE_LOGGER.logToolResult(toolName, true, "Result is null");
+                    return err;
                 }
                 
                 String resultStr = "";
@@ -92,20 +100,24 @@ public class ToolsFactory {
                 if (resultStr.isEmpty()) {
                     resultStr = printer.print(result);
                 }
+                FILE_LOGGER.logToolResult(toolName, false, resultStr);
                 return McpSchema.CallToolResult.builder()
                         .content(List.of(new McpSchema.TextContent(resultStr)))
                         .isError(false)
                         .build();
             } catch (IllegalArgumentException e) {
+                FILE_LOGGER.logToolError(toolName, e);
                 return errorResult("Invalid arguments: " + e.getMessage());
             } catch (java.lang.reflect.InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                String message = cause != null ? cause.getMessage() : e.getMessage();
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                FILE_LOGGER.logToolError(toolName, cause);
+                String message = cause.getMessage();
                 if (message == null || message.isEmpty()) {
-                    message = cause != null ? cause.getClass().getSimpleName() : "Unknown error";
+                    message = cause.getClass().getSimpleName();
                 }
                 return errorResult("Error executing tool: " + message);
             } catch (Exception e) {
+                FILE_LOGGER.logToolError(toolName, e);
                 String message = e.getMessage();
                 if (message == null || message.isEmpty()) {
                     message = e.getClass().getSimpleName();
@@ -228,12 +240,12 @@ public class ToolsFactory {
             if (value instanceof Number) {
                 return ((Number) value).intValue();
             }
-            return Integer.parseInt(value.toString());
+            return Integer.decode(value.toString());
         } else if (targetType == long.class || targetType == Long.class) {
             if (value instanceof Number) {
                 return ((Number) value).longValue();
             }
-            return Long.parseLong(value.toString());
+            return Long.decode(value.toString());
         } else if (targetType == boolean.class || targetType == Boolean.class) {
             if (value instanceof Boolean) {
                 return value;
@@ -262,9 +274,9 @@ public class ToolsFactory {
         if (targetType == String.class) {
             return defaultValue;
         } else if (targetType == int.class || targetType == Integer.class) {
-            return Integer.parseInt(defaultValue);
+            return Integer.decode(defaultValue);
         } else if (targetType == long.class || targetType == Long.class) {
-            return Long.parseLong(defaultValue);
+            return Long.decode(defaultValue);
         } else if (targetType == boolean.class || targetType == Boolean.class) {
             return Boolean.parseBoolean(defaultValue);
         } else if (targetType == double.class || targetType == Double.class) {

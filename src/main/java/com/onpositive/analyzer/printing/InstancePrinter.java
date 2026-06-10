@@ -45,7 +45,6 @@ public class InstancePrinter implements IValuePrinter {
         sb.append(String.format("Instance ID: %d%n", instance.getInstanceId()));
         sb.append(String.format("Class: %s%n", className));
         sb.append(String.format("Size: %d%n", instance.getSize()));
-        sb.append(String.format("Retained Size: %d%n", instance.getRetainedSize()));
 
         List<?> fieldValues = instance.getFieldValues();
         if (fieldValues != null && !fieldValues.isEmpty()) {

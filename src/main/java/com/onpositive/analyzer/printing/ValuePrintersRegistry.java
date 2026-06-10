@@ -14,7 +14,6 @@ public class ValuePrintersRegistry {
         register(org.netbeans.lib.profiler.heap.HeapSummary.class, new HeapSummaryPrinter());
         register(com.onpositive.analyzer.HeapDumpService.ClassStats.class, new ClassStatsListPrinter());
         register(com.onpositive.analyzer.HeapDumpService.GCRootInfo.class, new GCRootInfoListPrinter());
-        register(com.onpositive.analyzer.HeapDumpService.InstanceInfo.class, new InstanceInfoPrinter());
         register(com.onpositive.analyzer.HeapDumpService.ReferenceInfo.class, new ReferenceInfoListPrinter());
         register(org.netbeans.lib.profiler.heap.JavaClass.class, new JavaClassPrinterWrapper());
         register(java.util.Properties.class, new PropertiesPrinter());

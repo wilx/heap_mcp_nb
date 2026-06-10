@@ -5,16 +5,7 @@ import com.onpositive.analyzer.mcp.reflection.Default;
 import com.onpositive.analyzer.mcp.reflection.Printer;
 import com.onpositive.analyzer.mcp.reflection.Required;
 import com.onpositive.analyzer.mcp.reflection.Tool;
-import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
-import com.onpositive.analyzer.printing.ClassStatsListPrinter;
-import com.onpositive.analyzer.printing.GCRootInfoListPrinter;
-import com.onpositive.analyzer.printing.HeapSummaryPrinter;
-import com.onpositive.analyzer.printing.InstanceInfoPrinter;
-import com.onpositive.analyzer.printing.InstanceListPrinter;
-import com.onpositive.analyzer.printing.InstancePagePrinter;
-import com.onpositive.analyzer.printing.JavaClassPrinterWrapper;
-import com.onpositive.analyzer.printing.PropertiesPrinter;
-import com.onpositive.analyzer.printing.ReferenceInfoListPrinter;
+import com.onpositive.analyzer.printing.*;
 import com.onpositive.analyzer.search.Bm25Result;
 import org.netbeans.lib.profiler.heap.HeapSummary;
 import org.netbeans.lib.profiler.heap.Instance;
@@ -87,9 +78,19 @@ public class HeapDumpTools {
     }
 
     @Tool(name = "get_instance_by_id", title = "Get Instance By ID", decription = "Returns instance details by its internal ID, including class, size, retained size, and field values.")
-    @Printer(impl = InstanceInfoPrinter.class)
-    public HeapDumpService.InstanceInfo getInstanceById(@Required("id") String id) {
+    @Printer(impl = InstancePrinter.class)
+    public Instance getInstanceById(@Required("id") String id) {
         return heapDumpService.getInstanceById(parseId(id));
+    }
+
+    @Tool(name = "get_instance_retained_size", title = "Get Instance Retained Size", decription = "Returns the retained size of an instance by its ID. Computing retained size can be costly and may fail for complex heap graphs.")
+    public String getInstanceRetainedSize(@Required("id") String id) {
+        try {
+            long retainedSize = heapDumpService.getInstanceRetainedSize(parseId(id));
+            return String.format("Instance %d retained size: %d bytes", parseId(id), retainedSize);
+        } catch (Exception e) {
+            return String.format("Failed to compute retained size for instance %s: %s", id, e.getMessage());
+        }
     }
 
     @Tool(name = "get_all_references", title = "Get All References", decription = "Returns all references to an instance by its ID with pagination.")

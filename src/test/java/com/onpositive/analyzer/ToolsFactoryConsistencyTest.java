@@ -7,7 +7,6 @@ import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
 import com.onpositive.analyzer.printing.ClassStatsListPrinter;
 import com.onpositive.analyzer.printing.GCRootInfoListPrinter;
 import com.onpositive.analyzer.printing.HeapSummaryPrinter;
-import com.onpositive.analyzer.printing.InstanceInfoPrinter;
 import com.onpositive.analyzer.printing.InstanceListPrinter;
 import com.onpositive.analyzer.printing.JavaClassListPrinter;
 import com.onpositive.analyzer.printing.JavaClassPrinterWrapper;
@@ -26,12 +25,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ToolsFactoryConsistencyTest {
 
-    private HeapDumpService service;
     private HeapDumpTools tools;
 
     @BeforeEach
     void setUp() {
-        service = new HeapDumpService();
+        HeapDumpService service = new HeapDumpService();
         tools = new HeapDumpTools(service);
     }
 
@@ -68,6 +66,7 @@ public class ToolsFactoryConsistencyTest {
         assertTrue(specsMap.containsKey("get_summary"), "Should have get_summary tool");
         assertTrue(specsMap.containsKey("get_class_by_name"), "Should have get_class_by_name tool");
         assertTrue(specsMap.containsKey("get_instance_by_id"), "Should have get_instance_by_id tool");
+        assertTrue(specsMap.containsKey("get_instance_retained_size"), "Should have get_instance_retained_size tool");
         assertTrue(specsMap.containsKey("get_classes_by_regexp"), "Should have get_classes_by_regexp tool");
         assertTrue(specsMap.containsKey("execute_oql"), "Should have execute_oql tool");
         assertTrue(specsMap.containsKey("analyze_heap_dump"), "Should have analyze_heap_dump tool");
@@ -110,6 +109,7 @@ public class ToolsFactoryConsistencyTest {
         assertNotNull(getter.getJavaClassByNameTool());
         assertNotNull(getter.getJavaClassByIdTool());
         assertNotNull(getter.getInstanceByIdTool());
+        assertNotNull(getter.getInstanceRetainedSizeTool());
         assertNotNull(getter.getAllReferencesTool());
         assertNotNull(getter.getJavaClassesByRegExpTool());
         assertNotNull(getter.getSummaryTool());
@@ -121,16 +121,15 @@ public class ToolsFactoryConsistencyTest {
 
     @Test
     void testPrinterImplementationsExist() {
-        assertDoesNotThrow(() -> new HeapSummaryPrinter());
-        assertDoesNotThrow(() -> new ClassStatsListPrinter());
-        assertDoesNotThrow(() -> new GCRootInfoListPrinter());
-        assertDoesNotThrow(() -> new InstanceInfoPrinter());
-        assertDoesNotThrow(() -> new InstanceListPrinter());
-        assertDoesNotThrow(() -> new JavaClassPrinterWrapper());
-        assertDoesNotThrow(() -> new JavaClassListPrinter());
-        assertDoesNotThrow(() -> new PropertiesPrinter());
-        assertDoesNotThrow(() -> new ReferenceInfoListPrinter());
-        assertDoesNotThrow(() -> new Bm25ResultListPrinter());
+        assertDoesNotThrow(HeapSummaryPrinter::new);
+        assertDoesNotThrow(ClassStatsListPrinter::new);
+        assertDoesNotThrow(GCRootInfoListPrinter::new);
+        assertDoesNotThrow(InstanceListPrinter::new);
+        assertDoesNotThrow(JavaClassPrinterWrapper::new);
+        assertDoesNotThrow(JavaClassListPrinter::new);
+        assertDoesNotThrow(PropertiesPrinter::new);
+        assertDoesNotThrow(ReferenceInfoListPrinter::new);
+        assertDoesNotThrow(Bm25ResultListPrinter::new);
     }
 
     @Test
@@ -157,19 +156,6 @@ public class ToolsFactoryConsistencyTest {
         assertTrue(result.contains("Thread"));
         assertTrue(result.contains("123"));
         assertTrue(result.contains("java.lang.Thread"));
-    }
-
-    @Test
-    void testInstanceInfoPrinter() {
-        InstanceInfoPrinter printer = new InstanceInfoPrinter();
-        HeapDumpService.InstanceInfo info = new HeapDumpService.InstanceInfo(
-                123L, "TestClass", 100, 200,
-                List.of(new HeapDumpService.FieldInfo("field1", "value1", null))
-        );
-        String result = printer.print(info);
-        assertTrue(result.contains("123"));
-        assertTrue(result.contains("TestClass"));
-        assertTrue(result.contains("field1"));
     }
 
     @Test

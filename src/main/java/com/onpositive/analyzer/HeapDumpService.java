@@ -139,64 +139,16 @@ public class HeapDumpService {
         return heap.getJavaClassByID(id);
     }
 
-    public static class InstanceInfo {
-        public long instanceId;
-        public String className;
-        public long size;
-        public long retainedSize;
-        public List<FieldInfo> fields;
-
-        public InstanceInfo(long instanceId, String className, long size, long retainedSize, List<FieldInfo> fields) {
-            this.instanceId = instanceId;
-            this.className = className;
-            this.size = size;
-            this.retainedSize = retainedSize;
-            this.fields = fields;
-        }
-    }
-
-    public static class FieldInfo {
-        public String name;
-        public String value;
-        public Long objectInstanceId;
-
-        public FieldInfo(String name, String value, Long objectInstanceId) {
-            this.name = name;
-            this.value = value;
-            this.objectInstanceId = objectInstanceId;
-        }
-    }
-
-    public InstanceInfo getInstanceById(long id) {
+    public long getInstanceRetainedSize(long id) {
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         Instance instance = heap.getInstanceByID(id);
-        if (instance == null) return null;
-        
-        List<FieldInfo> fields = new ArrayList<>();
-        for (Object fvObj : instance.getFieldValues()) {
-            FieldValue fv = (FieldValue) fvObj;
-            String fieldName = fv.getField().getName();
-            String valueStr = String.valueOf(fv.getValue());
-            Long objectInstanceId = null;
-            
-            if (fv instanceof ObjectFieldValue) {
-                ObjectFieldValue ofv = (ObjectFieldValue) fv;
-                Instance refInstance = ofv.getInstance();
-                if (refInstance != null) {
-                    objectInstanceId = refInstance.getInstanceId();
-                }
-            }
-            
-            fields.add(new FieldInfo(fieldName, valueStr, objectInstanceId));
-        }
-        
-        return new InstanceInfo(
-                instance.getInstanceId(),
-                getClassName(instance),
-                instance.getSize(),
-                instance.getRetainedSize(),
-                fields
-        );
+        if (instance == null) throw new IllegalArgumentException("Instance not found: " + id);
+        return instance.getRetainedSize();
+    }
+
+    public Instance getInstanceById(long id) {
+        if (heap == null) throw new IllegalStateException("Heap not loaded");
+        return heap.getInstanceByID(id);
     }
 
     public static class ReferenceInfo {
@@ -219,14 +171,10 @@ public class HeapDumpService {
         Collection<?> references = instance.getReferences();
         List<Instance> refsList = new ArrayList<>();
         for (Object refObj : references) {
-            if (refObj instanceof FieldValue) {
-                FieldValue fv = (FieldValue) refObj;
-                if (fv instanceof ObjectFieldValue) {
-                    ObjectFieldValue ofv = (ObjectFieldValue) fv;
-                    Instance refInstance = ofv.getInstance();
-                    if (refInstance != null) {
-                        refsList.add(refInstance);
-                    }
+            if (refObj instanceof ObjectFieldValue ofv) {
+                Instance refInstance = ofv.getInstance();
+                if (refInstance != null) {
+                    refsList.add(refInstance);
                 }
             }
         }

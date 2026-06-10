@@ -82,6 +82,10 @@ public class ToolsGetter {
         return get("execute_oql");
     }
 
+    public McpServerFeatures.SyncToolSpecification getInstanceRetainedSizeTool() {
+        return get("get_instance_retained_size");
+    }
+
     public McpServerFeatures.SyncToolSpecification analyzeHeapTool() {
         return get("analyze_heap_dump");
     }

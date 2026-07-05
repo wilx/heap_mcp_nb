@@ -85,12 +85,9 @@ public class HeapDumpTools {
 
     @Tool(name = "get_instance_retained_size", title = "Get Instance Retained Size", decription = "Returns the retained size of an instance by its ID. Computing retained size can be costly and may fail for complex heap graphs.")
     public String getInstanceRetainedSize(@Required("id") String id) {
-        try {
-            long retainedSize = heapDumpService.getInstanceRetainedSize(parseId(id));
-            return String.format("Instance %d retained size: %d bytes", parseId(id), retainedSize);
-        } catch (Exception e) {
-            return String.format("Failed to compute retained size for instance %s: %s", id, e.getMessage());
-        }
+        long instanceId = parseId(id);
+        long retainedSize = heapDumpService.getInstanceRetainedSize(instanceId);
+        return String.format("Instance %d retained size: %d bytes", instanceId, retainedSize);
     }
 
     @Tool(name = "get_all_references", title = "Get All References", decription = "Returns incoming field and array-element references to an instance with pagination. Each result includes Via with the referring field name or array index.")

@@ -55,14 +55,11 @@ public class ToolsFactory {
             }
         }
 
-        McpSchema.JsonSchema inputSchema = new McpSchema.JsonSchema(
-                "object",
-                properties,
-                requiredParams.isEmpty() ? List.of() : requiredParams,
-                false,
-                null,
-                null
-        );
+        Map<String, Object> inputSchema = new LinkedHashMap<>();
+        inputSchema.put("type", "object");
+        inputSchema.put("properties", properties);
+        inputSchema.put("required", requiredParams.isEmpty() ? List.of() : requiredParams);
+        inputSchema.put("additionalProperties", false);
 
         McpSchema.Tool tool = new McpSchema.Tool(
                 toolAnnotation.name(),

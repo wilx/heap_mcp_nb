@@ -14,7 +14,6 @@ import com.onpositive.analyzer.printing.JavaClassPrinterWrapper;
 import com.onpositive.analyzer.printing.PropertiesPrinter;
 import com.onpositive.analyzer.printing.ReferenceInfoListPrinter;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
-import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,9 +83,9 @@ public class ToolsFactoryConsistencyTest {
                 .findFirst()
                 .orElseThrow();
         
-        McpSchema.JsonSchema inputSchema = loadHeapSpec.tool().inputSchema();
-        assertEquals("object", inputSchema.type());
-        assertTrue(inputSchema.required().contains("file_path"));
+        Map<String, Object> inputSchema = loadHeapSpec.tool().inputSchema();
+        assertEquals("object", inputSchema.get("type"));
+        assertTrue(required(inputSchema).contains("file_path"));
         assertEquals("Path to the .hprof heap dump file.",
                 property(inputSchema, "file_path").get("description"));
         
@@ -96,9 +95,9 @@ public class ToolsFactoryConsistencyTest {
                 .orElseThrow();
         
         inputSchema = getClassesSpec.tool().inputSchema();
-        assertEquals("object", inputSchema.type());
-        assertFalse(inputSchema.required().contains("from"), "from should not be required");
-        assertFalse(inputSchema.required().contains("to"), "to should not be required");
+        assertEquals("object", inputSchema.get("type"));
+        assertFalse(required(inputSchema).contains("from"), "from should not be required");
+        assertFalse(required(inputSchema).contains("to"), "to should not be required");
         assertEquals(0, property(inputSchema, "from").get("default"));
         assertEquals(0L, property(inputSchema, "from").get("minimum"));
         assertEquals(50, property(inputSchema, "to").get("default"));
@@ -121,7 +120,7 @@ public class ToolsFactoryConsistencyTest {
                 .orElseThrow();
 
         inputSchema = biggestObjectsSpec.tool().inputSchema();
-        assertTrue(inputSchema.required().contains("limit"));
+        assertTrue(required(inputSchema).contains("limit"));
         assertEquals(0L, property(inputSchema, "limit").get("minimum"));
     }
 
@@ -223,7 +222,17 @@ public class ToolsFactoryConsistencyTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> property(McpSchema.JsonSchema schema, String name) {
-        return (Map<String, Object>) schema.properties().get(name);
+    private static Map<String, Object> property(Map<String, Object> schema, String name) {
+        return (Map<String, Object>) properties(schema).get(name);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> properties(Map<String, Object> schema) {
+        return (Map<String, Object>) schema.get("properties");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> required(Map<String, Object> schema) {
+        return (List<String>) schema.get("required");
     }
 }

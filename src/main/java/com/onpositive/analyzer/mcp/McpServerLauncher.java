@@ -28,6 +28,7 @@ public class McpServerLauncher {
 
         return McpServer.sync(transportProvider)
                 .serverInfo("java-heap-analyzer", BuildInfo.version())
+                .validateToolInputs(true)
                 .capabilities(McpSchema.ServerCapabilities.builder()
                         .tools(true)
                         .logging()

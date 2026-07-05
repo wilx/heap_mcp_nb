@@ -87,6 +87,8 @@ public class ToolsFactoryConsistencyTest {
         McpSchema.JsonSchema inputSchema = loadHeapSpec.tool().inputSchema();
         assertEquals("object", inputSchema.type());
         assertTrue(inputSchema.required().contains("file_path"));
+        assertEquals("Path to the .hprof heap dump file.",
+                property(inputSchema, "file_path").get("description"));
         
         SyncToolSpecification getClassesSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("get_classes_by_max_instances_count"))
@@ -97,6 +99,30 @@ public class ToolsFactoryConsistencyTest {
         assertEquals("object", inputSchema.type());
         assertFalse(inputSchema.required().contains("from"), "from should not be required");
         assertFalse(inputSchema.required().contains("to"), "to should not be required");
+        assertEquals(0, property(inputSchema, "from").get("default"));
+        assertEquals(0L, property(inputSchema, "from").get("minimum"));
+        assertEquals(50, property(inputSchema, "to").get("default"));
+        assertEquals(0L, property(inputSchema, "to").get("minimum"));
+
+        SyncToolSpecification duplicateStringsSpec = specs.stream()
+                .filter(s -> s.tool().name().equals("get_duplicate_strings"))
+                .findFirst()
+                .orElseThrow();
+
+        inputSchema = duplicateStringsSpec.tool().inputSchema();
+        assertEquals("total_bytes", property(inputSchema, "sort_by").get("default"));
+        assertEquals(List.of("total_bytes", "duplicate_count"), property(inputSchema, "sort_by").get("enum"));
+        assertEquals(200, property(inputSchema, "max_value_length").get("default"));
+        assertEquals(0L, property(inputSchema, "max_value_length").get("minimum"));
+
+        SyncToolSpecification biggestObjectsSpec = specs.stream()
+                .filter(s -> s.tool().name().equals("get_biggest_objects"))
+                .findFirst()
+                .orElseThrow();
+
+        inputSchema = biggestObjectsSpec.tool().inputSchema();
+        assertTrue(inputSchema.required().contains("limit"));
+        assertEquals(0L, property(inputSchema, "limit").get("minimum"));
     }
 
     @Test
@@ -183,5 +209,10 @@ public class ToolsFactoryConsistencyTest {
         String result = printer.print(props);
         assertTrue(result.contains("key1=value1"));
         assertTrue(result.contains("key2=value2"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> property(McpSchema.JsonSchema schema, String name) {
+        return (Map<String, Object>) schema.properties().get(name);
     }
 }

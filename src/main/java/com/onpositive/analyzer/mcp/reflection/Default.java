@@ -10,4 +10,7 @@ import java.lang.annotation.Target;
 public @interface Default {
     String name();
     String value();
+    String description() default "";
+    long minimum() default Long.MIN_VALUE;
+    String[] enumValues() default {};
 }

@@ -4,22 +4,7 @@ This file records gaps found while comparing the documented MCP tools with their
 current implementations. The BM25 pagination cache-key issue is not listed
 because it was fixed in commit `9389f7e`.
 
-## 1. Generated MCP schemas omit useful parameter constraints
-
-`ToolsFactory` currently emits only the JSON type and required status for each
-parameter. Defaults from `@Default` are used during invocation but are absent
-from the published schema. The schemas also omit descriptions, minimum values,
-and allowed values such as the `get_duplicate_strings.sort_by` choices.
-
-Completion criteria:
-
-- Publish default values in each input schema.
-- Support parameter descriptions.
-- Publish numeric minimums for offsets, limits, and lengths.
-- Publish enum values where the accepted set is closed.
-- Add schema-level tests for required parameters, defaults, ranges, and enums.
-
-## 2. Regexp class-search cache is never populated
+## 1. Regexp class-search cache is never populated
 
 `HeapDumpService.getJavaClassesByRegExpPaginated` reads from `classesByRegexp`
 but does not put newly fetched results into it. Every cache miss therefore
@@ -32,7 +17,7 @@ Completion criteria:
 - Add a test proving repeated pages for the same expression query the heap only
   once.
 
-## 3. GC-root tools are duplicate APIs
+## 2. GC-root tools are duplicate APIs
 
 `get_gc_roots` and `get_gc_roots_paginated` have the same parameters, delegate
 to the same service method, and use the same printer. Their descriptions differ,
@@ -45,7 +30,7 @@ Completion criteria:
   clearly documented compatibility alias.
 - Ensure the README and compatibility tests reflect that decision.
 
-## 4. Smaller output and metadata defects
+## 3. Smaller output and metadata defects
 
 ### BM25 rank restarts on every page
 
@@ -76,3 +61,26 @@ Completion criteria:
   test cannot run in the normal suite.
 - Add MCP-level tests for error flags and output fields, not only tool
   registration.
+
+## Follow-up: consider MCP Java SDK 2.x migration
+
+This is not a correctness gap in the current implementation. MCP Java SDK 2.x
+would make richer tool schemas more native because `Tool.inputSchema` is a
+full JSON Schema `Map<String,Object>` and tool input validation is built into
+the server by default.
+
+Potential model-facing benefits:
+
+- Publish richer schema keywords such as descriptions, defaults, minimums, and
+  enums without squeezing them through the SDK 1.x `JsonSchema` record.
+- Let the SDK validate incoming tool arguments against the published schema.
+- Improve AI client argument selection and reduce invalid tool calls.
+
+Migration notes:
+
+- SDK 2.x has breaking API changes around tool schema construction, builders,
+  validation, and server setup.
+- The migration would not replace the need for good local tool and parameter
+  metadata.
+- Keep service-level validation even if MCP server-side validation is enabled,
+  since CLI and direct service paths bypass MCP tool-call validation.

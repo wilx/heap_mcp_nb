@@ -9,4 +9,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.PARAMETER)
 public @interface Required {
     String value();
+    String description() default "";
+    long minimum() default Long.MIN_VALUE;
+    String[] enumValues() default {};
 }

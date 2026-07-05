@@ -11,6 +11,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,7 +48,7 @@ public class ToolsFactory {
             }
 
             String jsonType = getJsonType(paramTypes[i]);
-            properties.put(paramInfo.name, new McpSchema.JsonSchema(jsonType, null, null, false, null, null));
+            properties.put(paramInfo.name, createPropertySchema(jsonType, paramTypes[i], paramInfo));
 
             if (paramInfo.isRequired) {
                 requiredParams.add(paramInfo.name);
@@ -147,11 +148,18 @@ public class ToolsFactory {
         String name;
         boolean isRequired;
         String defaultValue;
+        String description;
+        Long minimum;
+        List<String> enumValues;
 
-        ParamInfo(String name, boolean isRequired, String defaultValue) {
+        ParamInfo(String name, boolean isRequired, String defaultValue,
+                  String description, Long minimum, List<String> enumValues) {
             this.name = name;
             this.isRequired = isRequired;
             this.defaultValue = defaultValue;
+            this.description = description;
+            this.minimum = minimum;
+            this.enumValues = enumValues;
         }
     }
 
@@ -159,15 +167,25 @@ public class ToolsFactory {
         String name = null;
         boolean isRequired = false;
         String defaultValue = null;
+        String description = "";
+        Long minimum = null;
+        List<String> enumValues = List.of();
 
         for (Annotation annotation : annotations) {
             if (annotation instanceof Required) {
                 isRequired = true;
-                name = ((Required) annotation).value();
+                Required required = (Required) annotation;
+                name = required.value();
+                description = required.description();
+                minimum = minimumValue(required.minimum());
+                enumValues = List.of(required.enumValues());
             } else if (annotation instanceof Default) {
                 Default def = (Default) annotation;
                 name = def.name();
                 defaultValue = def.value();
+                description = def.description();
+                minimum = minimumValue(def.minimum());
+                enumValues = List.of(def.enumValues());
             }
         }
 
@@ -175,7 +193,29 @@ public class ToolsFactory {
             return null;
         }
 
-        return new ParamInfo(name, isRequired, defaultValue);
+        return new ParamInfo(name, isRequired, defaultValue, description, minimum, enumValues);
+    }
+
+    private static Map<String, Object> createPropertySchema(String jsonType, Class<?> paramType, ParamInfo paramInfo) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", jsonType);
+        if (paramInfo.description != null && !paramInfo.description.isEmpty()) {
+            schema.put("description", paramInfo.description);
+        }
+        if (paramInfo.defaultValue != null) {
+            schema.put("default", convertDefaultValue(paramInfo.defaultValue, paramType));
+        }
+        if (paramInfo.minimum != null) {
+            schema.put("minimum", paramInfo.minimum);
+        }
+        if (paramInfo.enumValues != null && !paramInfo.enumValues.isEmpty()) {
+            schema.put("enum", paramInfo.enumValues);
+        }
+        return schema;
+    }
+
+    private static Long minimumValue(long minimum) {
+        return minimum == Long.MIN_VALUE ? null : minimum;
     }
 
     private static String getJsonType(Class<?> paramType) {

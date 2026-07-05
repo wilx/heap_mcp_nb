@@ -6,14 +6,6 @@ because it was fixed in commit `9389f7e`.
 
 ## 1. Smaller output and metadata defects
 
-### Server version differs from the artifact version
-
-`McpServerLauncher` advertises version `0.0.1`, while `pom.xml` and documented
-artifact names use `0.0.3`.
-
-Completion criteria: derive server metadata from the build version, or update
-both values through one release process so they cannot drift.
-
 ### Coverage is weak around failure-prone heap operations
 
 Some integration and diagnostic tests are disabled, including the biggest

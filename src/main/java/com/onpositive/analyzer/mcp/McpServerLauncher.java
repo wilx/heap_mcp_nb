@@ -27,7 +27,7 @@ public class McpServerLauncher {
                 jsonMapper);
 
         return McpServer.sync(transportProvider)
-                .serverInfo("java-heap-analyzer", "0.0.1")
+                .serverInfo("java-heap-analyzer", BuildInfo.version())
                 .capabilities(McpSchema.ServerCapabilities.builder()
                         .tools(true)
                         .logging()

@@ -8,6 +8,7 @@ import org.netbeans.lib.profiler.heap.Instance;
 
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -25,7 +26,9 @@ class RetainedSizeMcpResultTest {
         McpSchema.CallToolResult result = retainedSizeResult(heap, "42");
 
         assertFalse(result.isError());
-        assertTrue(content(result).contains("Instance 42 retained size: 256 bytes"));
+        Map<String, Object> content = TestMcpContent.map(result);
+        assertEquals(42L, ((Number) content.get("id")).longValue());
+        assertEquals(256L, ((Number) content.get("retainedSize")).longValue());
     }
 
     @Test
@@ -58,12 +61,11 @@ class RetainedSizeMcpResultTest {
         field.setAccessible(true);
         field.set(service, heap);
 
-        ToolsGetter toolsGetter = new ToolsGetter(new HeapDumpTools(service));
-        return toolsGetter.getInstanceRetainedSizeTool().callHandler()
-                .apply(null, new McpSchema.CallToolRequest("get_instance_retained_size", Map.of("id", id)));
+        TestMcpTools tools = TestMcpTools.from(new HeapDumpTools(service));
+        return tools.call("get_instance_retained_size", Map.of("id", id));
     }
 
     private static String content(McpSchema.CallToolResult result) {
-        return ((McpSchema.TextContent) result.content().get(0)).text();
+        return TestMcpContent.text(result);
     }
 }

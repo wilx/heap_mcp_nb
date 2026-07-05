@@ -7,13 +7,14 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class HeapDumpMcpTest {
 
-    private ToolsGetter toolsGetter;
+    private TestMcpTools tools;
     private String samplePath;
     private HeapDumpService service;
 
@@ -21,7 +22,7 @@ public class HeapDumpMcpTest {
     void setUp() {
         service = new HeapDumpService();
         HeapDumpTools tools = new HeapDumpTools(service);
-        toolsGetter = new ToolsGetter(tools);
+        this.tools = TestMcpTools.from(tools);
         File sampleFile = new File("src/test/resources/HeapDumpSample.hprof");
         assertTrue(sampleFile.exists(), "Sample heap dump file not found at " + sampleFile.getAbsolutePath());
         samplePath = sampleFile.getAbsolutePath();
@@ -30,212 +31,210 @@ public class HeapDumpMcpTest {
     @Test
     void testLoadHeapAndGetSummary() {
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        McpSchema.CallToolResult result = toolsGetter.loadHeapTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("Total Instances"), "Summary should contain Total Instances");
-        assertTrue(content.contains("Total Size"), "Summary should contain Total Size");
+        Map<String, Object> summary = TestMcpContent.map(result);
+        assertTrue(((Number) summary.get("totalLiveInstances")).longValue() > 0);
+        assertTrue(((Number) summary.get("totalLiveBytes")).longValue() > 0);
     }
 
     @Test
     void testGetClassesByMaxInstancesCount() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_classes_by_max_instances_count", Map.of("from", 0, "to", 50));
-        McpSchema.CallToolResult result = toolsGetter.getClassesByMaxInstancesCountTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertFalse(content.isEmpty(), "Class list should not be empty");
-        assertTrue(content.contains("java.lang.String"), "Should contain java.lang.String");
+        List<Map<String, Object>> classes = TestMcpContent.list(result);
+        assertFalse(classes.isEmpty(), "Class list should not be empty");
+        assertTrue(classes.stream().anyMatch(item -> "java.lang.String".equals(item.get("className"))),
+                "Should contain java.lang.String");
     }
 
     @Test
     void testGetGCRootsAfterLoad() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_gc_roots", Map.of());
-        McpSchema.CallToolResult result = toolsGetter.getGCRootsTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertNotNull(content);
+        assertNotNull(result.structuredContent());
     }
 
     @Test
     void testGetClassByNameAfterLoad() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_class_by_name", Map.of("name", "java.lang.String"));
-        McpSchema.CallToolResult result = toolsGetter.getJavaClassByNameTool().callHandler().apply(null, request);
-        assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("java.lang.String"));
-        assertTrue(content.contains("Instances:"));
-        assertTrue(content.contains("Total Size:"));
-        assertTrue(content.contains("Fields:") || content.contains("Static Fields:"));
+        McpSchema.CallToolResult result = tools.call(request);
+        assertFalse(result.isError(), result.toString());
+        Map<String, Object> cls = TestMcpContent.map(result);
+        assertEquals("java.lang.String", cls.get("name"));
+        assertTrue(((Number) cls.get("instancesCount")).longValue() > 0);
+        assertTrue(((Number) cls.get("allInstancesSize")).longValue() > 0);
     }
 
     @Test
     void testGetClassesByRegexpAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getJavaClassesByRegExpTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "java\\.util\\..*")));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "java\\.util\\..*")));
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("java.util."));
+        assertTrue(TestMcpContent.list(result).stream()
+                .map(item -> (String) item.get("name"))
+                .anyMatch(name -> name.contains("java.util.")));
     }
 
     @Test
     void testGetSummaryAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getSummaryTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_summary", Map.of()));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_summary", Map.of()));
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("Total Instances"));
-        assertTrue(content.contains("Total Size"));
+        Map<String, Object> summary = TestMcpContent.map(result);
+        assertTrue(((Number) summary.get("totalLiveInstances")).longValue() > 0);
+        assertTrue(((Number) summary.get("totalLiveBytes")).longValue() > 0);
     }
 
     @Test
     void testGetSystemPropertiesAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getSystemPropertiesTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_system_properties", Map.of()));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_system_properties", Map.of()));
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertNotNull(content);
+        assertNotNull(TestMcpContent.map(result));
     }
 
     @Test
     void testGetDuplicateStringsAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null,
-                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
 
-        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringsTool().callHandler().apply(null,
+        McpSchema.CallToolResult result = tools.call(
                 new McpSchema.CallToolRequest("get_duplicate_strings", Map.of(
                         "sort_by", "duplicate_count", "from", 0, "to", 5,
                         "max_value_length", 20)));
 
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("Duplicate string groups:"));
-        assertTrue(content.contains("occurrences="));
-        assertFalse(content.contains("duplicates="));
-        assertTrue(content.contains("representative_id="));
-        assertFalse(content.contains("representative_backing_array_id="));
-        assertTrue(content.contains("total_bytes="));
+        Map<String, Object> page = TestMcpContent.map(result);
+        assertTrue(page.containsKey("items"));
+        List<Map<String, Object>> items = (List<Map<String, Object>>) page.get("items");
+        assertFalse(items.isEmpty());
+        assertTrue(items.get(0).containsKey("occurrenceCount"));
+        assertTrue(items.get(0).containsKey("representativeInstanceId"));
+        assertTrue(items.get(0).containsKey("totalShallowBytes"));
     }
 
     @Test
     void testGetDuplicateStringBackingArraysAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null,
-                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         HeapDumpService.DuplicateStringStats first = service
                 .getDuplicateStrings("duplicate_count", 0, 1, 20).items.getFirst();
 
-        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringBackingArraysTool().callHandler().apply(null,
+        McpSchema.CallToolResult result = tools.call(
                 new McpSchema.CallToolRequest("get_duplicate_string_backing_arrays", Map.of(
                         "representative_id", Long.toString(first.representativeInstanceId),
                         "max_value_length", 20)));
 
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("Duplicate string backing arrays"));
-        assertTrue(content.contains("representative_id=" + first.representativeInstanceId));
-        assertTrue(content.contains("backing_array_id="));
-        assertTrue(content.contains("string_instance_ids="));
+        Map<String, Object> arrays = TestMcpContent.map(result);
+        assertEquals(first.representativeInstanceId, ((Number) arrays.get("representativeInstanceId")).longValue());
+        List<Map<String, Object>> backingArrays = (List<Map<String, Object>>) arrays.get("backingArrays");
+        assertFalse(backingArrays.isEmpty());
+        assertTrue(backingArrays.get(0).containsKey("backingArrayId"));
+        assertTrue(backingArrays.get(0).containsKey("stringInstanceIds"));
     }
 
     @Test
     void testGetDuplicateStringsRejectsInvalidSort() {
-        toolsGetter.loadHeapTool().callHandler().apply(null,
-                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
 
-        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringsTool().callHandler().apply(null,
+        McpSchema.CallToolResult result = tools.call(
                 new McpSchema.CallToolRequest("get_duplicate_strings", Map.of("sort_by", "retained_size")));
 
         assertTrue(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        String content = TestMcpContent.text(result);
         assertTrue(content.contains("sort_by"));
     }
 
     @Test
     void testAnalyzeHeapDump() {
-        McpSchema.CallToolResult result = toolsGetter.analyzeHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("analyze_heap_dump", Map.of(
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("analyze_heap_dump", Map.of(
                 "file_path", samplePath,
                 "limit", 5
         )));
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        String content = TestMcpContent.text(result);
         assertTrue(content.contains("Top"));
         assertTrue(content.contains("Class Name"));
     }
 
     @Test
     void testGetJavaClassByIdAfterLoad() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getJavaClassByIdTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_class_by_id", Map.of("id", 1L)));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_class_by_id", Map.of("id", 1L)));
         if (!result.isError()) {
-            String content = ((McpSchema.TextContent) result.content().get(0)).text();
-            assertTrue(content.contains("Instances:"));
-            assertTrue(content.contains("Total Size:"));
+            Map<String, Object> cls = TestMcpContent.map(result);
+            assertTrue(cls.containsKey("instancesCount"));
+            assertTrue(cls.containsKey("allInstancesSize"));
         }
     }
 
     @Test
     void testChainedOperationsLoadGetClassesSummary() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult classesResult = toolsGetter.getClassesByMaxInstancesCountTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_classes_by_max_instances_count", Map.of("from", 0, "to", 50)));
+        McpSchema.CallToolResult classesResult = tools.call(new McpSchema.CallToolRequest("get_classes_by_max_instances_count", Map.of("from", 0, "to", 50)));
         assertFalse(classesResult.isError());
         
-        McpSchema.CallToolResult summaryResult = toolsGetter.getSummaryTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_summary", Map.of()));
+        McpSchema.CallToolResult summaryResult = tools.call(new McpSchema.CallToolRequest("get_summary", Map.of()));
         assertFalse(summaryResult.isError());
         
-        McpSchema.CallToolResult gcRootsResult = toolsGetter.getGCRootsTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_gc_roots", Map.of()));
+        McpSchema.CallToolResult gcRootsResult = tools.call(new McpSchema.CallToolRequest("get_gc_roots", Map.of()));
         assertFalse(gcRootsResult.isError());
     }
 
     @Test
     void testMultipleLoadsReturnConsistentResults() {
-        McpSchema.CallToolResult result1 = toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        McpSchema.CallToolResult result1 = tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         assertFalse(result1.isError());
-        String content1 = ((McpSchema.TextContent) result1.content().get(0)).text();
+        Map<String, Object> content1 = TestMcpContent.map(result1);
         
-        McpSchema.CallToolResult result2 = toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        McpSchema.CallToolResult result2 = tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         assertFalse(result2.isError());
-        String content2 = ((McpSchema.TextContent) result2.content().get(0)).text();
+        Map<String, Object> content2 = TestMcpContent.map(result2);
         
         assertEquals(content1, content2, "Multiple loads should return consistent results");
     }
 
     @Test
     void testGetClassByNameNonExistent() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getJavaClassByNameTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_class_by_name", Map.of("name", "com.nonexistent.Class")));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_class_by_name", Map.of("name", "com.nonexistent.Class")));
         assertTrue(result.isError(), "Should return error for non-existent class");
     }
 
     @Test
     void testGetClassesByRegexpNoMatch() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
         
-        McpSchema.CallToolResult result = toolsGetter.getJavaClassesByRegExpTool().callHandler().apply(null, new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "^[xyz].*")));
+        McpSchema.CallToolResult result = tools.call(new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "^[xyz].*")));
         assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.isEmpty() || !content.contains("java."), "Should not contain java classes for regex ^[xyz].*");
+        assertTrue(TestMcpContent.list(result).stream()
+                .noneMatch(item -> ((String) item.get("name")).contains("java.")),
+                "Should not contain java classes for regex ^[xyz].*");
     }
 
     @Test
     void testExecuteOqlWithoutLoadingHeap() {
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "SELECT * FROM javax.swing.JFrame", "max_results", 10));
-        McpSchema.CallToolResult result = toolsGetter.executeOqlTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         assertTrue(result.isError(), "Should return error when executing OQL without loading heap first");
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        String content = TestMcpContent.text(result);
         assertTrue(content.contains("Heap not loaded") || content.contains("not loaded"), 
             "Error message should indicate heap is not loaded. Got: " + content);
     }
@@ -243,11 +242,11 @@ public class HeapDumpMcpTest {
     @Test
     void testExecuteOqlAfterLoadingHeap() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s from java.lang.String s", "max_results", 10));
-        McpSchema.CallToolResult result = toolsGetter.executeOqlTool().callHandler().apply(null, request);
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        McpSchema.CallToolResult result = tools.call(request);
+        String content = TestMcpContent.text(result);
         System.out.println("OQL Result: " + content);
         assertTrue(content.contains("Query Results"),
             "Should return valid results when executing OQL after loading heap. Got: " + content);
@@ -256,11 +255,11 @@ public class HeapDumpMcpTest {
     @Test
     void testOqlGetFieldAfterLoadingHeap() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
 
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s.value from java.lang.String s", "max_results", 10));
-        McpSchema.CallToolResult result = toolsGetter.executeOqlTool().callHandler().apply(null, request);
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        McpSchema.CallToolResult result = tools.call(request);
+        String content = TestMcpContent.text(result);
         assertTrue(content.contains("Array:char[]"),
                 "Should return valid results when executing OQL after loading heap. Got: " + content);
     }
@@ -268,11 +267,11 @@ public class HeapDumpMcpTest {
     @Test
     void testExecuteOqlWithQualifiedClassName() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select f from javax.swing.JFrame f", "max_results", 10));
-        McpSchema.CallToolResult result = toolsGetter.executeOqlTool().callHandler().apply(null, request);
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        McpSchema.CallToolResult result = tools.call(request);
+        String content = TestMcpContent.text(result);
         System.out.println("OQL Result: " + content);
         assertTrue(result.isError() || content.contains("Query Results") || content.contains("No results found"),
             "Should handle OQL query with qualified class name. Got: " + content);
@@ -281,19 +280,19 @@ public class HeapDumpMcpTest {
     @Test
     void testGetAllReferencesAfterLoad() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
 
         McpSchema.CallToolRequest oqlRequest = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s from java.lang.String s where s.value != null", "max_results", 1));
-        McpSchema.CallToolResult oqlResult = toolsGetter.executeOqlTool().callHandler().apply(null, oqlRequest);
-        String oqlContent = ((McpSchema.TextContent) oqlResult.content().get(0)).text();
+        McpSchema.CallToolResult oqlResult = tools.call(oqlRequest);
+        String oqlContent = TestMcpContent.text(oqlResult);
 
         if (oqlContent.contains("Instance ID:")) {
             String instanceIdStr = oqlContent.replaceAll(".*Instance ID:\\s*(\\d+).*", "$1");
             try {
                 long instanceId = Long.parseLong(instanceIdStr);
                 McpSchema.CallToolRequest refsRequest = new McpSchema.CallToolRequest("get_all_references", Map.of("id", instanceId, "from", 0, "to", 10));
-                McpSchema.CallToolResult refsResult = toolsGetter.getAllReferencesTool().callHandler().apply(null, refsRequest);
-                assertFalse(refsResult.isError(), "get_all_references should not return error: " + ((McpSchema.TextContent) refsResult.content().get(0)).text());
+                McpSchema.CallToolResult refsResult = tools.call(refsRequest);
+                assertFalse(refsResult.isError(), "get_all_references should not return error: " + refsResult);
             } catch (NumberFormatException e) {
                 System.out.println("Could not parse instance ID from OQL result: " + oqlContent);
             }
@@ -302,10 +301,10 @@ public class HeapDumpMcpTest {
 
     @Test
     void testGetAllReferencesInvalidId() {
-        toolsGetter.loadHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        tools.call(new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
 
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_all_references", Map.of("id", 999999999L, "from", 0, "to", 10));
-        McpSchema.CallToolResult result = toolsGetter.getAllReferencesTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         assertFalse(result.isError(), "Should handle non-existent instance gracefully");
     }
 
@@ -313,15 +312,15 @@ public class HeapDumpMcpTest {
     @Disabled("HeapDumpSample.hprof triggers upstream NetBeans HprofGCRoot.getGCRoot() NullPointerException while computing retained sizes; covered by HeapDumpServiceBiggestObjectsTest")
     void testGetBiggestObjectsAfterLoad() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
-        toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);
+        tools.call(loadRequest);
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_biggest_objects", Map.of("limit", 10));
-        McpSchema.CallToolResult result = toolsGetter.getBiggestObjectsTool().callHandler().apply(null, request);
+        McpSchema.CallToolResult result = tools.call(request);
         
         assertFalse(result.isError(), "get_biggest_objects should not throw exception when heap is loaded. Error: " + 
-            (result.content() != null && !result.content().isEmpty() ? ((McpSchema.TextContent) result.content().get(0)).text() : "unknown"));
+            (result.content() != null && !result.content().isEmpty() ? TestMcpContent.text(result) : "unknown"));
         
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        String content = TestMcpContent.text(result);
         assertNotNull(content, "Content should not be null");
     }
 }

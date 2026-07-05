@@ -34,7 +34,7 @@ public class McpClientIntegrationTest {
         String classpath = System.getProperty("java.class.path");
 
         ServerParameters params = ServerParameters.builder(javaBin)
-                .args("-cp", classpath, "com.onpositive.analyzer.mcp.McpServerLauncher")
+                .args("-cp", classpath, "com.onpositive.analyzer.mcp.HeapAnalyzerMcpApplication")
                 .build();
 
         tools.jackson.databind.json.JsonMapper jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();
@@ -64,6 +64,22 @@ public class McpClientIntegrationTest {
     }
 
     @Test
+    void duplicateStringsAdvertisesOutputSchemaViaClient() {
+        McpSchema.ListToolsResult tools = client.listTools(null);
+
+        McpSchema.Tool duplicateStrings = tools.tools().stream()
+                .filter(tool -> "get_duplicate_strings".equals(tool.name()))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(duplicateStrings.outputSchema(), "Expected output schema for get_duplicate_strings");
+        assertEquals("object", duplicateStrings.outputSchema().get("type"));
+        assertTrue(properties(duplicateStrings.outputSchema()).containsKey("items"));
+        assertTrue(properties(duplicateStrings.outputSchema()).containsKey("totalGroups"));
+        assertTrue(properties(duplicateStrings.outputSchema()).containsKey("stringsScanned"));
+    }
+
+    @Test
     void testLoadHeapAndGetSummaryViaClient() {
         // 1. Load heap
         McpSchema.CallToolResult loadResult = client.callTool(
@@ -76,9 +92,10 @@ public class McpClientIntegrationTest {
                 new McpSchema.CallToolRequest("get_summary", Map.of())
         );
         assertFalse(summaryResult.isError());
-        
-        String content = ((McpSchema.TextContent) summaryResult.content().get(0)).text();
-        assertTrue(content.contains("Total Instances"), "Summary should contain Total Instances");
+
+        Map<String, Object> summary = structured(summaryResult);
+        assertTrue(((Number) summary.get("totalLiveInstances")).longValue() > 0);
+        assertTrue(((Number) summary.get("totalLiveBytes")).longValue() > 0);
     }
 
     @Test
@@ -89,10 +106,12 @@ public class McpClientIntegrationTest {
                 new McpSchema.CallToolRequest("get_classes_by_max_instances_count", Map.of("from", 0, "to", 10))
         );
         
-        assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertFalse(content.isEmpty());
-        assertTrue(content.contains("java.lang.String") || content.contains("char[]") || content.contains("byte[]"));
+        assertFalse(result.isError(), result.toString());
+        List<Map<String, Object>> classes = structuredList(result);
+        assertFalse(classes.isEmpty());
+        assertTrue(classes.stream()
+                .map(item -> (String) item.get("className"))
+                .anyMatch(name -> name.equals("java.lang.String") || name.equals("char[]") || name.equals("byte[]")));
     }
 
     @Test
@@ -103,9 +122,10 @@ public class McpClientIntegrationTest {
                 new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "java\\.util\\..*", "from", 0, "to", 10))
         );
         
-        assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("java.util."));
+        assertFalse(result.isError(), result.toString());
+        assertTrue(structuredList(result).stream()
+                .map(item -> (String) item.get("name"))
+                .anyMatch(name -> name.contains("java.util.")));
     }
 
     @Test
@@ -116,8 +136,26 @@ public class McpClientIntegrationTest {
                 new McpSchema.CallToolRequest("get_classes_by_regexp", Map.of("regexp", "java\\..*"))
         );
         
-        assertFalse(result.isError());
-        String content = ((McpSchema.TextContent) result.content().get(0)).text();
-        assertTrue(content.contains("java."));
+        assertFalse(result.isError(), result.toString());
+        assertTrue(structuredList(result).stream()
+                .map(item -> (String) item.get("name"))
+                .anyMatch(name -> name.contains("java.")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> structured(McpSchema.CallToolResult result) {
+        assertNotNull(result.structuredContent(), "Expected structured content");
+        return (Map<String, Object>) result.structuredContent();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> structuredList(McpSchema.CallToolResult result) {
+        assertNotNull(result.structuredContent(), "Expected structured content");
+        return (List<Map<String, Object>>) result.structuredContent();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> properties(Map<String, Object> schema) {
+        return (Map<String, Object>) schema.getOrDefault("properties", Map.of());
     }
 }

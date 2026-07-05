@@ -12,7 +12,8 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 - **GC Root Analysis** - View garbage collection roots with pagination
 - **Heap Summary & Properties** - Get overview statistics and JVM system properties from the heap dump
 - **OQL Support** - Execute Object Query Language queries on the heap
-- **Reflection-based Tool Registration** - Tools are automatically generated from `@Tool`-annotated methods
+- **Spring AI MCP Server** - Tools are registered through Spring AI MCP annotations and exposed over STDIO by default
+- **Structured Output Schemas** - Typed tools advertise JSON schemas with field descriptions for structured MCP clients
 
 ## Architecture
 
@@ -22,7 +23,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 └─────────────────────────┬───────────────────────────────────┘
                           │ MCP Protocol (JSON-RPC)
 ┌─────────────────────────▼───────────────────────────────────┐
-│                    MCP Server                               │
+│              Spring Boot / Spring AI MCP Server             │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │              HeapDumpTools (MCP Adapter)            │    │
 │  └─────────────────────────┬───────────────────────────┘    │
@@ -55,8 +56,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `get_instance_retained_size` | Compute retained size of an instance by ID (separate from `get_instance_by_id` since retained size computation is costly and may fail) |
 | `get_biggest_objects` | Find largest objects by retained size |
 | `get_all_references` | Get incoming field and array-element references to an instance, including the referring object and field name or array index (paginated) |
-| `get_gc_roots` | Canonical tool for viewing GC root references with pagination (defaults 0-50), including kind and instance info |
-| `get_gc_roots_paginated` | Compatibility alias for `get_gc_roots`; returns the same paginated GC root data |
+| `get_gc_roots` | View GC root references with pagination (defaults 0-50), including kind and instance info |
 | `get_system_properties` | Access JVM system properties captured in the heap dump |
 | `execute_oql` | Execute OQL queries (e.g., `select s.value from java.lang.String s`) |
 | `analyze_heap_dump` | One-shot: load a heap dump and return top classes by instance count |
@@ -76,7 +76,7 @@ Download the JAR from the [releases page](https://github.com/anomalyco/heap_mcp_
 mvn clean package
 ```
 
-This creates a shaded JAR at `target/heap_mcp_nb-0.0.3.jar` with all dependencies included.
+This creates an executable Spring Boot JAR at `target/heap_mcp_nb-0.0.3.jar`.
 
 ## Running
 
@@ -86,7 +86,7 @@ This creates a shaded JAR at `target/heap_mcp_nb-0.0.3.jar` with all dependencie
 java -jar target/heap_mcp_nb-0.0.3.jar
 ```
 
-The server communicates via STDIO, compatible with any MCP client.
+The server is a Spring Boot application using Spring AI MCP server auto-configuration. It communicates via STDIO by default, compatible with MCP clients such as Codex.
 
 ### Configuration
 
@@ -152,63 +152,38 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 10. get_all_references(id=12345)            → Find what holds this instance
 ```
 
-`get_duplicate_strings` reports raw shallow bytes associated with the String objects and their distinct backing arrays. Within one duplicate-string group, backing arrays are deduplicated before contributing to `backing_bytes` and `total_bytes`. These figures are not retained size or estimated savings. Backing arrays shared by legacy substring spans can appear in more than one value group, so totals across rows are not necessarily additive. Use `get_duplicate_string_backing_arrays` with a row's `representative_id` to list the unique backing arrays and the String instance IDs that reference them.
+`get_duplicate_strings` reports raw shallow bytes associated with the String objects and their distinct backing arrays. Within one duplicate-string group, backing arrays are deduplicated before contributing to `backingArrayShallowBytes` and `totalShallowBytes`. These figures are not retained size or estimated savings. Backing arrays shared by legacy substring spans can appear in more than one value group, so totals across rows are not necessarily additive. Use `get_duplicate_string_backing_arrays` with a row's `representativeInstanceId` as `representative_id` to list the unique backing arrays and the String instance IDs that reference them.
 
 ### Tool Response Format
 
-Most tools return results as newline-separated text. For example:
+Most typed tools return structured MCP content and advertise JSON output schemas. For example, `get_duplicate_strings` returns an object with fields such as `items`, `totalGroups`, `stringsScanned`, `decodingFailures`, and pagination metadata. Each `items` entry includes fields such as `value`, `occurrenceCount`, `duplicateCount`, `representativeInstanceId`, and shallow-byte totals.
 
-```text
-get_all_references:
-Instance ID: 101, Class: example.Owner, Via: payload
-Instance ID: 202, Class: java.lang.Object[], Via: [7]
-```
+Text-oriented tools remain text responses where the result is inherently free-form, such as `execute_oql` and `analyze_heap_dump`.
 
-`Via` identifies the field or array element containing the incoming reference.
+## Spring AI Tool Registration
 
-For class details:
-
-```
-get_class_by_name:
-Name: java.util.HashMap
-Instances: 152
-Total Size: 24320
-Superclass: java.util.AbstractMap
-Static Fields:
-  int DEFAULT_INITIAL_CAPACITY = 16
-  float loadFactor = 0.75 (Instance ID: 123456789)
-Fields:
-  java.util.HashMap$Node[] table
-  int size
-  int threshold
-  float loadFactor
-```
-
-## Reflection-based Tool Factory
-
-Tools are defined via annotations on methods in `HeapDumpTools` and automatically registered by `ToolsFactory`:
+Tools are defined in `HeapDumpTools` with Spring AI MCP annotations:
 
 ```java
-@Tool(name = "my_tool", title = "My Tool", decription = "Does something")
-@Printer(impl = MyPrinter.class)
-public String myToolMethod(
-    @Required("param1") String param1,
-    @Default(name = "param2", value = "50") int param2) {
-    // implementation
+@McpTool(name = "get_summary", title = "Get Heap Summary",
+    description = "Returns the summary of the loaded heap.",
+    generateOutputSchema = true)
+public McpDtos.HeapSummaryDto getSummary() {
+    return McpDtos.HeapSummaryDto.from(heapDumpService.getSummary());
 }
 ```
 
-See `src/main/java/com/onpositive/analyzer/mcp/reflection/` for annotation definitions.
+Input parameters use `@McpToolParam` for names, required flags, and descriptions. `@Schema` is used for constraints and defaults on inputs, and for field descriptions on structured output DTOs.
 
 ## Dependencies
 
-- **io.modelcontextprotocol.sdk:mcp** (1.1.3) - MCP Java SDK
+- **org.springframework.ai:spring-ai-starter-mcp-server** (2.0.0) - Spring AI MCP server auto-configuration
+- **io.modelcontextprotocol.sdk:mcp** (2.0.0) - MCP Java SDK client/server types
 - **org.netbeans.modules:org-netbeans-lib-profiler** (RELEASE300) - Heap analysis
 - **org.netbeans.modules:org-netbeans-modules-profiler-oql** (RELEASE300) - OQL engine
 - **org.openjdk.nashorn:nashorn-core** (15.7) - JavaScript engine for OQL
 - **com.carrotsearch:hppc** (0.10.0) - Memory-efficient primitive collections
 - **org.apache.commons:commons-lang3** (3.20.0) - General utilities
-- **org.slf4j:slf4j-simple** (2.0.17) - Logging implementation
 - **JUnit Jupiter** (5.13.4) - Testing framework
 - **org.mockito:mockito-core** (5.23.0) - Test mocks
 

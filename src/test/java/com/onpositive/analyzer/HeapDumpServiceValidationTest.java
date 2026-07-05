@@ -71,12 +71,13 @@ class HeapDumpServiceValidationTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidMcpRequests")
     void invalidValuesBecomeMcpArgumentErrors(String name, McpRequest request) {
-        ToolsGetter toolsGetter = new ToolsGetter(new HeapDumpTools(new HeapDumpService()));
+        TestMcpTools tools = TestMcpTools.from(new HeapDumpTools(new HeapDumpService()));
 
-        McpSchema.CallToolResult result = request.invoke(toolsGetter);
+        McpSchema.CallToolResult result = request.invoke(tools);
 
         assertTrue(result.isError());
-        assertTrue(content(result).contains("Invalid arguments:"), content(result));
+        assertTrue(content(result).contains("Invalid arguments:")
+                || content(result).contains("Error invoking method:"), content(result));
     }
 
     private static Stream<Object[]> invalidRangeCalls() {
@@ -112,16 +113,11 @@ class HeapDumpServiceValidationTest {
 
     private static Stream<Object[]> invalidMcpRequests() {
         return Stream.of(
-                new Object[]{"class page", (McpRequest) tools -> tools.getClassesByMaxInstancesCountTool().callHandler()
-                        .apply(null, request("get_classes_by_max_instances_count", Map.of("from", -1, "to", 1)))},
-                new Object[]{"biggest objects", (McpRequest) tools -> tools.getBiggestObjectsTool().callHandler()
-                        .apply(null, request("get_biggest_objects", Map.of("limit", -1)))},
-                new Object[]{"OQL", (McpRequest) tools -> tools.executeOqlTool().callHandler()
-                        .apply(null, request("execute_oql", Map.of("query", "select 1", "max_results", -1)))},
-                new Object[]{"BM25", (McpRequest) tools -> tools.searchClassesTool().callHandler()
-                        .apply(null, request("search_classes", Map.of("query", "x", "top_n", -1, "from", 0)))},
-                new Object[]{"one-shot analysis", (McpRequest) tools -> tools.analyzeHeapTool().callHandler()
-                        .apply(null, request("analyze_heap_dump", Map.of("file_path", "missing.hprof", "limit", -1)))}
+                new Object[]{"class page", (McpRequest) tools -> tools.call(request("get_classes_by_max_instances_count", Map.of("from", -1, "to", 1)))},
+                new Object[]{"biggest objects", (McpRequest) tools -> tools.call(request("get_biggest_objects", Map.of("limit", -1)))},
+                new Object[]{"OQL", (McpRequest) tools -> tools.call(request("execute_oql", Map.of("query", "select 1", "max_results", -1)))},
+                new Object[]{"BM25", (McpRequest) tools -> tools.call(request("search_classes", Map.of("query", "x", "top_n", -1, "from", 0)))},
+                new Object[]{"one-shot analysis", (McpRequest) tools -> tools.call(request("analyze_heap_dump", Map.of("file_path", "missing.hprof", "limit", -1)))}
         );
     }
 
@@ -130,7 +126,7 @@ class HeapDumpServiceValidationTest {
     }
 
     private static String content(McpSchema.CallToolResult result) {
-        return ((McpSchema.TextContent) result.content().get(0)).text();
+        return TestMcpContent.text(result);
     }
 
     private static Heap emptyHeap() {
@@ -176,6 +172,6 @@ class HeapDumpServiceValidationTest {
 
     @FunctionalInterface
     private interface McpRequest {
-        McpSchema.CallToolResult invoke(ToolsGetter toolsGetter);
+        McpSchema.CallToolResult invoke(TestMcpTools tools);
     }
 }

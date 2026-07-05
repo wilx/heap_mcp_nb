@@ -9,6 +9,7 @@ import com.onpositive.analyzer.search.InMemoryBm25Index;
 import com.onpositive.analyzer.util.ValueUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.netbeans.lib.profiler.heap.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,8 +46,11 @@ public class HeapDumpService {
     private DuplicateStringsAnalysis duplicateStringsAnalysis;
 
     public static class InstancePage {
+        @Schema(description = "Page of instances returned for the requested class.")
         public final List<Instance> instances;
+        @Schema(description = "Total number of instances available for the requested class.")
         public final long totalCount;
+        @Schema(description = "Number of instances remaining after this page.")
         public final long remaining;
 
         public InstancePage(List<Instance> instances, long totalCount, long remaining) {
@@ -57,8 +61,11 @@ public class HeapDumpService {
     }
 
     public static class ClassStats {
+        @Schema(description = "Fully qualified Java class name.")
         public String className;
+        @Schema(description = "Number of live instances of this class in the heap dump.")
         public long instanceCount;
+        @Schema(description = "Total shallow bytes used by all live instances of this class.")
         public long size;
 
         public ClassStats(String className, long instanceCount, long size) {
@@ -72,14 +79,23 @@ public class HeapDumpService {
     }
 
     public static class DuplicateStringStats {
+        @Schema(description = "Duplicate string value, truncated to the requested maximum length.")
         public final String value;
+        @Schema(description = "Number of java.lang.String instances that have this value.")
         public final long occurrenceCount;
+        @Schema(description = "Number of redundant instances beyond the first occurrence.")
         public final long duplicateCount;
+        @Schema(description = "Length of the original string value in UTF-16 code units.")
         public final int stringLength;
+        @Schema(description = "Instance ID of a representative java.lang.String for this value group.")
         public final long representativeInstanceId;
+        @Schema(description = "Total shallow bytes used by java.lang.String instances in this value group.")
         public final long stringShallowBytes;
+        @Schema(description = "Number of distinct backing arrays referenced by strings in this value group.")
         public final int distinctBackingArrayCount;
+        @Schema(description = "Total shallow bytes used by distinct backing arrays for this value group.")
         public final long backingArrayShallowBytes;
+        @Schema(description = "Combined shallow bytes for strings and distinct backing arrays in this value group.")
         public final long totalShallowBytes;
         private final List<DuplicateStringBackingArray> backingArrays;
 
@@ -102,8 +118,11 @@ public class HeapDumpService {
     }
 
     public static class DuplicateStringBackingArray {
+        @Schema(description = "Instance ID of the backing char[] or byte[] array.")
         public final long backingArrayId;
+        @Schema(description = "Shallow size in bytes of the backing array.")
         public final long shallowSize;
+        @Schema(description = "IDs of java.lang.String instances that reference this backing array.")
         public final List<Long> stringInstanceIds;
 
         private DuplicateStringBackingArray(long backingArrayId, long shallowSize, List<Long> stringInstanceIds) {
@@ -114,15 +133,25 @@ public class HeapDumpService {
     }
 
     public static class DuplicateStringBackingArrays {
+        @Schema(description = "Duplicate string value, truncated to the requested maximum length.")
         public final String value;
+        @Schema(description = "Number of java.lang.String instances that have this value.")
         public final long occurrenceCount;
+        @Schema(description = "Length of the original string value in UTF-16 code units.")
         public final int stringLength;
+        @Schema(description = "Instance ID of the representative java.lang.String used to identify this value group.")
         public final long representativeInstanceId;
+        @Schema(description = "Total shallow bytes used by java.lang.String instances in this value group.")
         public final long stringShallowBytes;
+        @Schema(description = "Number of distinct backing arrays referenced by strings in this value group.")
         public final int distinctBackingArrayCount;
+        @Schema(description = "Total shallow bytes used by distinct backing arrays for this value group.")
         public final long backingArrayShallowBytes;
+        @Schema(description = "Combined shallow bytes for strings and distinct backing arrays in this value group.")
         public final long totalShallowBytes;
+        @Schema(description = "Maximum number of characters included in the returned string value.")
         public final int maxValueLength;
+        @Schema(description = "Backing arrays for this duplicate string value group.")
         public final List<DuplicateStringBackingArray> backingArrays;
 
         private DuplicateStringBackingArrays(DuplicateStringStats stats, int maxValueLength) {
@@ -140,13 +169,21 @@ public class HeapDumpService {
     }
 
     public static class DuplicateStringsPage {
+        @Schema(description = "Page of duplicate string value groups.")
         public final List<DuplicateStringStats> items;
+        @Schema(description = "Number of java.lang.String instances scanned while building duplicate groups.")
         public final long stringsScanned;
+        @Schema(description = "Number of string instances whose value could not be decoded.")
         public final long decodingFailures;
+        @Schema(description = "Total number of duplicate string value groups available before pagination.")
         public final int totalGroups;
+        @Schema(description = "Zero-based start offset of this page, inclusive.")
         public final int from;
+        @Schema(description = "Zero-based end offset requested for this page, exclusive.")
         public final int to;
+        @Schema(description = "Number of duplicate string value groups remaining after this page.")
         public final int remaining;
+        @Schema(description = "Maximum number of characters included in each returned string value.")
         public final int maxValueLength;
 
         private DuplicateStringsPage(List<DuplicateStringStats> items, long stringsScanned,
@@ -380,8 +417,11 @@ public class HeapDumpService {
     }
 
     public static class GCRootInfo {
+        @Schema(description = "GC root kind reported by the heap parser.")
         public String kind;
+        @Schema(description = "Internal heap instance ID of the GC root object.")
         public long instanceId;
+        @Schema(description = "Fully qualified Java class name of the GC root object.")
         public String instanceClassName;
 
         public GCRootInfo(String kind, long instanceId, String instanceClassName) {
@@ -463,8 +503,11 @@ public class HeapDumpService {
     }
 
     public static class ReferenceInfo {
+        @Schema(description = "Internal heap instance ID of the object that references the target instance.")
         public long instanceId;
+        @Schema(description = "Fully qualified Java class name of the referring object.")
         public String className;
+        @Schema(description = "Referring field name or array index path that points to the target instance.")
         public String fieldName;
 
         public ReferenceInfo(long instanceId, String className, String fieldName) {

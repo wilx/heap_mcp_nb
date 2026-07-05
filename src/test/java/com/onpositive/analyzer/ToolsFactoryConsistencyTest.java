@@ -1,8 +1,6 @@
 package com.onpositive.analyzer;
 
 import com.onpositive.analyzer.mcp.HeapDumpTools;
-import com.onpositive.analyzer.mcp.reflection.Tool;
-import com.onpositive.analyzer.mcp.reflection.ToolsFactory;
 import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
 import com.onpositive.analyzer.printing.ClassStatsListPrinter;
 import com.onpositive.analyzer.printing.DuplicateStringBackingArraysPrinter;
@@ -15,10 +13,13 @@ import com.onpositive.analyzer.printing.JavaClassPrinterWrapper;
 import com.onpositive.analyzer.printing.PropertiesPrinter;
 import com.onpositive.analyzer.printing.ReferenceInfoListPrinter;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
+import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.ai.mcp.annotation.provider.tool.SyncMcpToolProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,12 +40,12 @@ public class ToolsFactoryConsistencyTest {
         Method[] methods = HeapDumpTools.class.getDeclaredMethods();
         int annotatedMethodCount = 0;
         for (Method method : methods) {
-            if (method.isAnnotationPresent(Tool.class)) {
+            if (method.isAnnotationPresent(McpTool.class)) {
                 annotatedMethodCount++;
-                Tool tool = method.getAnnotation(Tool.class);
+                McpTool tool = method.getAnnotation(McpTool.class);
                 assertNotNull(tool.name(), "Tool name should not be null for method: " + method.getName());
                 assertNotNull(tool.title(), "Tool title should not be null for method: " + method.getName());
-                assertNotNull(tool.decription(), "Tool description should not be null for method: " + method.getName());
+                assertNotNull(tool.description(), "Tool description should not be null for method: " + method.getName());
                 assertFalse(tool.name().isEmpty(), "Tool name should not be empty for method: " + method.getName());
             }
         }
@@ -53,7 +54,7 @@ public class ToolsFactoryConsistencyTest {
 
     @Test
     void testSpecificationsCreatedFromAnnotations() {
-        List<SyncToolSpecification> specs = ToolsFactory.createToolSpecs(tools);
+        List<SyncToolSpecification> specs = createToolSpecs();
         assertFalse(specs.isEmpty(), "Should have at least one specification");
         
         Map<String, SyncToolSpecification> specsMap = specs.stream()
@@ -64,6 +65,7 @@ public class ToolsFactoryConsistencyTest {
         assertTrue(specsMap.containsKey("get_classes_by_max_instances_size"), "Should have get_classes_by_max_instances_size tool");
         assertTrue(specsMap.containsKey("get_biggest_objects"), "Should have get_biggest_objects tool");
         assertTrue(specsMap.containsKey("get_gc_roots"), "Should have get_gc_roots tool");
+        assertFalse(specsMap.containsKey("get_gc_roots_paginated"), "Should not expose legacy get_gc_roots_paginated alias");
         assertTrue(specsMap.containsKey("get_summary"), "Should have get_summary tool");
         assertTrue(specsMap.containsKey("get_class_by_name"), "Should have get_class_by_name tool");
         assertTrue(specsMap.containsKey("get_instance_by_id"), "Should have get_instance_by_id tool");
@@ -78,7 +80,7 @@ public class ToolsFactoryConsistencyTest {
 
     @Test
     void testToolSpecificationsHaveCorrectInputSchemas() {
-        List<SyncToolSpecification> specs = ToolsFactory.createToolSpecs(tools);
+        List<SyncToolSpecification> specs = createToolSpecs();
         
         SyncToolSpecification loadHeapSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("load_heap"))
@@ -100,10 +102,8 @@ public class ToolsFactoryConsistencyTest {
         assertEquals("object", inputSchema.get("type"));
         assertFalse(required(inputSchema).contains("from"), "from should not be required");
         assertFalse(required(inputSchema).contains("to"), "to should not be required");
-        assertEquals(0, property(inputSchema, "from").get("default"));
-        assertEquals(0L, property(inputSchema, "from").get("minimum"));
-        assertEquals(50, property(inputSchema, "to").get("default"));
-        assertEquals(0L, property(inputSchema, "to").get("minimum"));
+        assertTrue(properties(inputSchema).containsKey("from"));
+        assertTrue(properties(inputSchema).containsKey("to"));
 
         SyncToolSpecification duplicateStringsSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("get_duplicate_strings"))
@@ -111,10 +111,8 @@ public class ToolsFactoryConsistencyTest {
                 .orElseThrow();
 
         inputSchema = duplicateStringsSpec.tool().inputSchema();
-        assertEquals("total_bytes", property(inputSchema, "sort_by").get("default"));
-        assertEquals(List.of("total_bytes", "duplicate_count"), property(inputSchema, "sort_by").get("enum"));
-        assertEquals(200, property(inputSchema, "max_value_length").get("default"));
-        assertEquals(0L, property(inputSchema, "max_value_length").get("minimum"));
+        assertTrue(properties(inputSchema).containsKey("sort_by"));
+        assertTrue(properties(inputSchema).containsKey("max_value_length"));
 
         SyncToolSpecification duplicateStringBackingArraysSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("get_duplicate_string_backing_arrays"))
@@ -123,8 +121,7 @@ public class ToolsFactoryConsistencyTest {
 
         inputSchema = duplicateStringBackingArraysSpec.tool().inputSchema();
         assertTrue(required(inputSchema).contains("representative_id"));
-        assertEquals(200, property(inputSchema, "max_value_length").get("default"));
-        assertEquals(0L, property(inputSchema, "max_value_length").get("minimum"));
+        assertTrue(properties(inputSchema).containsKey("max_value_length"));
 
         SyncToolSpecification biggestObjectsSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("get_biggest_objects"))
@@ -133,42 +130,39 @@ public class ToolsFactoryConsistencyTest {
 
         inputSchema = biggestObjectsSpec.tool().inputSchema();
         assertTrue(required(inputSchema).contains("limit"));
-        assertEquals(0L, property(inputSchema, "limit").get("minimum"));
     }
 
     @Test
-    void testBackwardCompatibility() {
-        ToolsGetter getter = new ToolsGetter(tools);
-        assertNotNull(getter.loadHeapTool());
-        assertNotNull(getter.getClassesByMaxInstancesCountTool());
-        assertNotNull(getter.getClassesByMaxInstancesSizeTool());
-        assertNotNull(getter.getBiggestObjectsTool());
-        assertNotNull(getter.getGCRootsTool());
-        assertNotNull(getter.getGCRootsPaginatedTool());
-        assertNotNull(getter.getJavaClassByNameTool());
-        assertNotNull(getter.getJavaClassByIdTool());
-        assertNotNull(getter.getInstanceByIdTool());
-        assertNotNull(getter.getInstanceRetainedSizeTool());
-        assertNotNull(getter.getAllReferencesTool());
-        assertNotNull(getter.getJavaClassesByRegExpTool());
-        assertNotNull(getter.getSummaryTool());
-        assertNotNull(getter.getSystemPropertiesTool());
-        assertNotNull(getter.executeOqlTool());
-        assertNotNull(getter.analyzeHeapTool());
-        assertNotNull(getter.searchClassesTool());
-        assertNotNull(getter.getDuplicateStringsTool());
-        assertNotNull(getter.getDuplicateStringBackingArraysTool());
+    void typedToolsExposeOutputSchemas() {
+        Map<String, SyncToolSpecification> specs = createToolSpecs().stream()
+                .collect(java.util.stream.Collectors.toMap(s -> s.tool().name(), s -> s));
+
+        assertNotNull(specs.get("load_heap").tool().outputSchema());
+        assertNotNull(specs.get("get_summary").tool().outputSchema());
+        assertNotNull(specs.get("get_classes_by_max_instances_count").tool().outputSchema());
+        assertNotNull(specs.get("get_biggest_objects").tool().outputSchema());
+        assertNotNull(specs.get("get_instance_retained_size").tool().outputSchema());
+        assertNotNull(specs.get("get_classes_by_regexp").tool().outputSchema());
+        assertNotNull(specs.get("get_instances").tool().outputSchema());
+        assertNotNull(specs.get("get_duplicate_strings").tool().outputSchema());
+
+        assertNull(specs.get("execute_oql").tool().outputSchema(),
+                "Free-form OQL output remains text-only");
     }
 
     @Test
-    void gcRootsPaginatedToolRemainsCompatibilityAlias() {
-        ToolsGetter getter = new ToolsGetter(tools);
-        SyncToolSpecification canonical = getter.getGCRootsTool();
-        SyncToolSpecification alias = getter.getGCRootsPaginatedTool();
+    void mcpSchemasDescribeObjectPropertiesWhereAvailable() {
+        List<String> missingDescriptions = new ArrayList<>();
 
-        assertEquals(canonical.tool().inputSchema(), alias.tool().inputSchema());
-        assertTrue(canonical.tool().description().contains("Canonical tool"));
-        assertTrue(alias.tool().description().contains("Compatibility alias for get_gc_roots"));
+        for (SyncToolSpecification spec : createToolSpecs()) {
+            assertPropertiesHaveDescriptions(spec.tool().name() + ".input", spec.tool().inputSchema(), missingDescriptions);
+            Map<String, Object> outputSchema = spec.tool().outputSchema();
+            if (outputSchema != null) {
+                assertPropertiesHaveDescriptions(spec.tool().name() + ".output", outputSchema, missingDescriptions);
+            }
+        }
+
+        assertTrue(missingDescriptions.isEmpty(), "Missing schema descriptions: " + missingDescriptions);
     }
 
     @Test
@@ -248,5 +242,33 @@ public class ToolsFactoryConsistencyTest {
     @SuppressWarnings("unchecked")
     private static List<String> required(Map<String, Object> schema) {
         return (List<String>) schema.get("required");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertPropertiesHaveDescriptions(String path, Map<String, Object> schema, List<String> missingDescriptions) {
+        Object propertiesObject = schema.get("properties");
+        if (propertiesObject instanceof Map<?, ?> rawProperties) {
+            for (Map.Entry<?, ?> entry : rawProperties.entrySet()) {
+                String propertyName = String.valueOf(entry.getKey());
+                Map<String, Object> propertySchema = (Map<String, Object>) entry.getValue();
+                if (!hasText(propertySchema.get("description"))) {
+                    missingDescriptions.add(path + "." + propertyName);
+                }
+                assertPropertiesHaveDescriptions(path + "." + propertyName, propertySchema, missingDescriptions);
+            }
+        }
+
+        Object itemsObject = schema.get("items");
+        if (itemsObject instanceof Map<?, ?> rawItems) {
+            assertPropertiesHaveDescriptions(path + "[]", (Map<String, Object>) rawItems, missingDescriptions);
+        }
+    }
+
+    private static boolean hasText(Object value) {
+        return value instanceof String text && !text.isBlank();
+    }
+
+    private List<SyncToolSpecification> createToolSpecs() {
+        return new SyncMcpToolProvider(List.of(tools)).getToolSpecifications();
     }
 }

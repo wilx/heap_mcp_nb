@@ -10,8 +10,8 @@ import org.netbeans.lib.profiler.heap.JavaClass;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,10 +26,10 @@ class BiggestObjectsMcpResultTest {
         McpSchema.CallToolResult result = biggestObjectsResult(heap, 1);
 
         assertFalse(result.isError());
-        String content = content(result);
-        assertTrue(content.contains("ID: 11"), content);
-        assertTrue(content.contains("Class: com.example.Largest"), content);
-        assertTrue(content.contains("Retained Size: 512 bytes"), content);
+        Map<String, Object> item = content(result);
+        assertEquals(11L, ((Number) item.get("id")).longValue());
+        assertEquals("com.example.Largest", item.get("className"));
+        assertEquals(512L, ((Number) item.get("retainedSize")).longValue());
     }
 
     @Test
@@ -42,10 +42,10 @@ class BiggestObjectsMcpResultTest {
         McpSchema.CallToolResult result = biggestObjectsResult(heap, 1);
 
         assertFalse(result.isError());
-        String content = content(result);
-        assertTrue(content.contains("ID: 12"), content);
-        assertTrue(content.contains("Class: com.example.Broken"), content);
-        assertTrue(content.contains("Retained Size Error: retained graph failed"), content);
+        Map<String, Object> item = content(result);
+        assertEquals(12L, ((Number) item.get("id")).longValue());
+        assertEquals("com.example.Broken", item.get("className"));
+        assertEquals("retained graph failed", item.get("retainedSizeError"));
     }
 
     private static McpSchema.CallToolResult biggestObjectsResult(Heap heap, int limit) throws Exception {
@@ -54,9 +54,8 @@ class BiggestObjectsMcpResultTest {
         field.setAccessible(true);
         field.set(service, heap);
 
-        ToolsGetter toolsGetter = new ToolsGetter(new HeapDumpTools(service));
-        return toolsGetter.getBiggestObjectsTool().callHandler()
-                .apply(null, new McpSchema.CallToolRequest("get_biggest_objects", Map.of("limit", limit)));
+        TestMcpTools tools = TestMcpTools.from(new HeapDumpTools(service));
+        return tools.call("get_biggest_objects", Map.of("limit", limit));
     }
 
     private static Instance instance(long id, String className, long retainedSize) {
@@ -70,7 +69,7 @@ class BiggestObjectsMcpResultTest {
         return instance;
     }
 
-    private static String content(McpSchema.CallToolResult result) {
-        return ((McpSchema.TextContent) result.content().get(0)).text();
+    private static Map<String, Object> content(McpSchema.CallToolResult result) {
+        return TestMcpContent.list(result).get(0);
     }
 }

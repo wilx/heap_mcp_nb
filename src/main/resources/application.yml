@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: java-heap-analyzer
+  main:
+    banner-mode: off
+    web-application-type: none
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: true
+        type: SYNC
+        name: java-heap-analyzer
+        version: "@project.version@"
+        instructions: This MCP server is aimed at Java heap dump .hprof file analysis
+        annotation-scanner:
+          enabled: true
+
+logging:
+  level:
+    root: OFF

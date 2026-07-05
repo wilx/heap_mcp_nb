@@ -10,11 +10,10 @@
 
     <dependencies>
         <!-- MCP Java SDK -->
-        <!-- Source: https://mvnrepository.com/artifact/io.modelcontextprotocol.sdk/mcp -->
         <dependency>
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp</artifactId>
-            <version>1.1.2</version>
+            <version>1.1.3</version>
             <scope>compile</scope>
         </dependency>
 
@@ -22,61 +21,61 @@
         <dependency>
             <groupId>org.netbeans.modules</groupId>
             <artifactId>org-netbeans-lib-profiler</artifactId>
-            <version>RELEASE200</version> <!-- Or specific version available -->
+            <version>RELEASE300</version>
         </dependency>
 
         <dependency>
             <groupId>org.netbeans.modules</groupId>
             <artifactId>org-netbeans-modules-profiler-oql</artifactId>
-            <version>RELEASE200</version>
+            <version>RELEASE300</version>
         </dependency>
 
         <!-- Nashorn JavaScript engine required for OQL execution -->
         <dependency>
             <groupId>org.openjdk.nashorn</groupId>
             <artifactId>nashorn-core</artifactId>
-            <version>15.4</version>
+            <version>15.7</version>
         </dependency>
 
         <!-- HPPC – High Performance Primitive Collections for memory-efficient index structures -->
         <dependency>
             <groupId>com.carrotsearch</groupId>
             <artifactId>hppc</artifactId>
-            <version>0.9.1</version>
+            <version>0.10.0</version>
         </dependency>
 
         <!-- Apache Commons Lang -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.14.0</version>
+            <version>3.20.0</version>
         </dependency>
 
         <!-- SLF4J for logging (required by SDK) -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>2.0.9</version>
+            <version>2.0.17</version>
         </dependency>
 
         <!-- JUnit for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.0</version>
+            <version>5.13.4</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.10.0</version>
+            <version>5.13.4</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -85,7 +84,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <phase>package</phase>

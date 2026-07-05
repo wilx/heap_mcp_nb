@@ -7,12 +7,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.netbeans.lib.profiler.heap.GCRoot;
 import org.netbeans.lib.profiler.heap.Heap;
+import org.netbeans.lib.profiler.heap.Instance;
+import org.netbeans.lib.profiler.heap.JavaClass;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -43,6 +46,26 @@ class HeapDumpServiceValidationTest {
         assertTrue(service.getGCRootsPaginated(0, 0).isEmpty());
         assertTrue(service.getJavaClassesByRegExpPaginated(".*", 0, 0).isEmpty());
         assertTrue(service.getInstancesByClassName("missing.Class", 0, 0).instances.isEmpty());
+    }
+
+    @Test
+    void gcRootsSkipAdjacentDuplicatesBeforePagination() throws Exception {
+        Heap heap = mock(Heap.class);
+        List<GCRoot> roots = List.of(
+                gcRoot(GCRoot.JNI_GLOBAL, 1L, "com.example.First"),
+                gcRoot(GCRoot.JNI_GLOBAL, 1L, "com.example.First"),
+                gcRoot(GCRoot.JNI_GLOBAL, 2L, "com.example.Second"),
+                gcRoot(GCRoot.JNI_GLOBAL, 2L, "com.example.Second")
+        );
+        when(heap.getGCRoots()).thenReturn(roots);
+
+        HeapDumpService service = serviceWithHeap(heap);
+
+        List<HeapDumpService.GCRootInfo> page = service.getGCRootsPaginated(1, 2);
+
+        assertEquals(1, page.size());
+        assertEquals(2L, page.get(0).instanceId);
+        assertEquals("com.example.Second", page.get(0).instanceClassName);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -117,6 +140,20 @@ class HeapDumpServiceValidationTest {
         when(heap.getJavaClassesByRegExp(".*")).thenReturn(List.of());
         when(heap.getBiggestObjectsByRetainedSize(0)).thenReturn(List.of());
         return heap;
+    }
+
+    private static GCRoot gcRoot(String kind, long instanceId, String className) {
+        JavaClass javaClass = mock(JavaClass.class);
+        when(javaClass.getName()).thenReturn(className);
+
+        Instance instance = mock(Instance.class);
+        when(instance.getInstanceId()).thenReturn(instanceId);
+        when(instance.getJavaClass()).thenReturn(javaClass);
+
+        GCRoot root = mock(GCRoot.class);
+        when(root.getKind()).thenReturn(kind);
+        when(root.getInstance()).thenReturn(instance);
+        return root;
     }
 
     private static HeapDumpService serviceWithHeap(Heap heap) throws Exception {

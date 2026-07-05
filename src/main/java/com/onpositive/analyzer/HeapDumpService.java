@@ -311,7 +311,7 @@ public class HeapDumpService {
         validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         Collection<GCRoot> allRoots = heap.getGCRoots();
-        List<GCRoot> rootsList = new ArrayList<>(allRoots);
+        List<GCRoot> rootsList = deduplicateAdjacentGCRoots(allRoots);
         int safeTo = Math.min(to, rootsList.size());
         int safeFrom = Math.min(from, safeTo);
         List<GCRoot> page = rootsList.subList(safeFrom, safeTo);
@@ -327,6 +327,32 @@ public class HeapDumpService {
             }
         }
         return result;
+    }
+
+    private static List<GCRoot> deduplicateAdjacentGCRoots(Collection<GCRoot> roots) {
+        List<GCRoot> deduplicated = new ArrayList<>();
+        String previousKind = null;
+        long previousInstanceId = Long.MIN_VALUE;
+        boolean hasPrevious = false;
+
+        for (GCRoot root : roots) {
+            Instance instance = root.getInstance();
+            if (instance == null) {
+                continue;
+            }
+
+            String kind = root.getKind();
+            long instanceId = instance.getInstanceId();
+            if (hasPrevious && instanceId == previousInstanceId && java.util.Objects.equals(kind, previousKind)) {
+                continue;
+            }
+
+            deduplicated.add(root);
+            previousKind = kind;
+            previousInstanceId = instanceId;
+            hasPrevious = true;
+        }
+        return deduplicated;
     }
 
 

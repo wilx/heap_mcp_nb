@@ -4,25 +4,7 @@ This file records gaps found while comparing the documented MCP tools with their
 current implementations. The BM25 pagination cache-key issue is not listed
 because it was fixed in commit `9389f7e`.
 
-## 1. Pagination and limit validation is inconsistent
-
-`get_duplicate_strings` validates `0 <= from <= to`, but most other paginated
-methods only clamp values with `Math.min`. Negative `from`, negative `to`,
-`from > to`, negative `top_n`, and negative limits can consequently produce
-inconsistent results or `IndexOutOfBoundsException`.
-
-Affected APIs include class lists, GC roots, incoming references, regexp class
-search, instances, BM25 search, biggest objects, OQL result limits, and the
-one-shot analysis limit.
-
-Completion criteria:
-
-- Introduce shared validation for ranges and non-negative limits.
-- Define whether `to` is exclusive and use that convention everywhere.
-- Return MCP argument errors for invalid values.
-- Add parameterized boundary tests for every pagination shape.
-
-## 2. Generated MCP schemas omit useful parameter constraints
+## 1. Generated MCP schemas omit useful parameter constraints
 
 `ToolsFactory` currently emits only the JSON type and required status for each
 parameter. Defaults from `@Default` are used during invocation but are absent
@@ -37,7 +19,7 @@ Completion criteria:
 - Publish enum values where the accepted set is closed.
 - Add schema-level tests for required parameters, defaults, ranges, and enums.
 
-## 3. Regexp class-search cache is never populated
+## 2. Regexp class-search cache is never populated
 
 `HeapDumpService.getJavaClassesByRegExpPaginated` reads from `classesByRegexp`
 but does not put newly fetched results into it. Every cache miss therefore
@@ -50,7 +32,7 @@ Completion criteria:
 - Add a test proving repeated pages for the same expression query the heap only
   once.
 
-## 4. GC-root tools are duplicate APIs
+## 3. GC-root tools are duplicate APIs
 
 `get_gc_roots` and `get_gc_roots_paginated` have the same parameters, delegate
 to the same service method, and use the same printer. Their descriptions differ,
@@ -63,7 +45,7 @@ Completion criteria:
   clearly documented compatibility alias.
 - Ensure the README and compatibility tests reflect that decision.
 
-## 5. Smaller output and metadata defects
+## 4. Smaller output and metadata defects
 
 ### BM25 rank restarts on every page
 

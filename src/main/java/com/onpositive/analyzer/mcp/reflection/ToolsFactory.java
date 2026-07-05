@@ -115,6 +115,9 @@ public class ToolsFactory {
                 if (message == null || message.isEmpty()) {
                     message = cause.getClass().getSimpleName();
                 }
+                if (cause instanceof IllegalArgumentException) {
+                    return errorResult("Invalid arguments: " + message);
+                }
                 return errorResult("Error executing tool: " + message);
             } catch (Exception e) {
                 FILE_LOGGER.logToolError(toolName, e);

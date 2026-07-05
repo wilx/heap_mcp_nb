@@ -159,15 +159,11 @@ public class HeapDumpService {
     }
 
     public DuplicateStringsPage getDuplicateStrings(String sortBy, int from, int to, int maxValueLength) {
+        validateRange(from, to);
+        validateNonNegative("max_value_length", maxValueLength);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         if (!"total_bytes".equals(sortBy) && !"duplicate_count".equals(sortBy)) {
             throw new IllegalArgumentException("sort_by must be 'total_bytes' or 'duplicate_count'");
-        }
-        if (from < 0 || to < from) {
-            throw new IllegalArgumentException("Expected 0 <= from <= to");
-        }
-        if (maxValueLength < 0) {
-            throw new IllegalArgumentException("max_value_length must be non-negative");
         }
         if (duplicateStringsAnalysis == null) {
             duplicateStringsAnalysis = analyzeDuplicateStrings();
@@ -243,6 +239,7 @@ public class HeapDumpService {
     }
 
     public List<ClassStats> getClassesByMaxInstancesCount(int from, int to) {
+        validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         if (classesSortedByCount == null) {
             classesSortedByCount = ((Collection<JavaClass>) heap.getAllClasses()).stream()
@@ -256,6 +253,7 @@ public class HeapDumpService {
     }
 
     public List<ClassStats> getClassesByMaxInstancesSize(int from, int to) {
+        validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         if (classesSortedBySize == null) {
             classesSortedBySize = ((Collection<JavaClass>) heap.getAllClasses()).stream()
@@ -269,6 +267,7 @@ public class HeapDumpService {
     }
 
     public List<RetainedInstance> getBiggestObjectsByRetainedSize(int limit) {
+        validateNonNegative("limit", limit);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         List<?> biggestObjects = heap.getBiggestObjectsByRetainedSize(limit);
         List<RetainedInstance> result = new ArrayList<>();
@@ -302,6 +301,7 @@ public class HeapDumpService {
     }
 
     public List<GCRootInfo> getGCRootsPaginated(int from, int to) {
+        validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         Collection<GCRoot> allRoots = heap.getGCRoots();
         List<GCRoot> rootsList = new ArrayList<>(allRoots);
@@ -358,6 +358,7 @@ public class HeapDumpService {
     }
 
     public List<ReferenceInfo> getAllReferences(long instanceId, int from, int to) {
+        validateRange(from, to);
         // Resolve the target instance before asking NetBeans for its incoming references.
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         Instance instance = heap.getInstanceByID(instanceId);
@@ -392,6 +393,7 @@ public class HeapDumpService {
     }
 
     public List<JavaClass> getJavaClassesByRegExpPaginated(String regexp, int from, int to) {
+        validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         List<JavaClass> classesList = classesByRegexp.get(regexp);
         if (classesList == null) {
@@ -403,6 +405,7 @@ public class HeapDumpService {
     }
 
     public InstancePage getInstancesByClassName(String className, int from, int to) {
+        validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         JavaClass javaClass = heap.getJavaClassByName(className);
         if (javaClass == null) return new InstancePage(new ArrayList<>(), 0, 0);
@@ -430,11 +433,13 @@ public class HeapDumpService {
     }
 
     public List<ClassStats> getTopClasses(String filePath, int limit) throws IOException {
+        validateNonNegative("limit", limit);
         loadHeap(filePath);
         return getClassesByMaxInstancesCount(0, limit);
     }
 
     public String executeOql(String query, int maxResults) throws Exception {
+        validateNonNegative("max_results", maxResults);
         if (heap == null) {
             throw new IllegalStateException("Heap not loaded. Please load a heap dump first.");
         }
@@ -456,6 +461,8 @@ public class HeapDumpService {
     }
 
     public List<Bm25Result> searchClassesBm25(String query, int topN, int from) {
+        validateNonNegative("top_n", topN);
+        validateNonNegative("from", from);
         if (heap == null) {
             throw new IllegalStateException("Heap not loaded");
         }
@@ -484,5 +491,17 @@ public class HeapDumpService {
         int safeFrom = Math.min(from, fullResults.size());
         int safeTo = Math.min(safeFrom + topN, fullResults.size());
         return fullResults.subList(safeFrom, safeTo);
+    }
+
+    private static void validateRange(int from, int to) {
+        if (from < 0 || to < from) {
+            throw new IllegalArgumentException("Expected 0 <= from <= to, where to is exclusive");
+        }
+    }
+
+    private static void validateNonNegative(String name, int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException(name + " must be non-negative");
+        }
     }
 }

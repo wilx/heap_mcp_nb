@@ -599,7 +599,7 @@ public class HeapDumpService {
         return getClassesByMaxInstancesCount(0, limit);
     }
 
-    public String executeOql(String query, int maxResults) throws Exception {
+    public OqlQueryExecutor.OqlResult executeOql(String query, int maxResults) throws Exception {
         validateNonNegative("max_results", maxResults);
         if (heap == null) {
             throw new IllegalStateException("Heap not loaded. Please load a heap dump first.");

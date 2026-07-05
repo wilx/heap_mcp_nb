@@ -246,10 +246,11 @@ public class HeapDumpMcpTest {
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s from java.lang.String s", "max_results", 10));
         McpSchema.CallToolResult result = tools.call(request);
-        String content = TestMcpContent.text(result);
-        System.out.println("OQL Result: " + content);
-        assertTrue(content.contains("Query Results"),
-            "Should return valid results when executing OQL after loading heap. Got: " + content);
+        assertFalse(result.isError(), result.toString());
+        Map<String, Object> content = TestMcpContent.map(result);
+        assertTrue(((Number) content.get("returnedCount")).intValue() > 0,
+            "Should return valid rows when executing OQL after loading heap. Got: " + content);
+        assertTrue(oqlRows(content).stream().anyMatch(row -> "string".equals(row.get("kind"))));
     }
 
     @Test
@@ -259,9 +260,12 @@ public class HeapDumpMcpTest {
 
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s.value from java.lang.String s", "max_results", 10));
         McpSchema.CallToolResult result = tools.call(request);
-        String content = TestMcpContent.text(result);
-        assertTrue(content.contains("Array:char[]"),
-                "Should return valid results when executing OQL after loading heap. Got: " + content);
+        assertFalse(result.isError(), result.toString());
+        Map<String, Object> content = TestMcpContent.map(result);
+        assertTrue(oqlRows(content).stream()
+                        .anyMatch(row -> "primitive_array".equals(row.get("kind"))
+                                && "char[]".equals(row.get("className"))),
+                "Should return char[] rows when executing OQL after loading heap. Got: " + content);
     }
 
     @Test
@@ -271,10 +275,10 @@ public class HeapDumpMcpTest {
         
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select f from javax.swing.JFrame f", "max_results", 10));
         McpSchema.CallToolResult result = tools.call(request);
-        String content = TestMcpContent.text(result);
-        System.out.println("OQL Result: " + content);
-        assertTrue(result.isError() || content.contains("Query Results") || content.contains("No results found"),
-            "Should handle OQL query with qualified class name. Got: " + content);
+        if (!result.isError()) {
+            Map<String, Object> content = TestMcpContent.map(result);
+            assertNotNull(content.get("rows"), "Should handle OQL query with qualified class name. Got: " + content);
+        }
     }
 
     @Test
@@ -284,18 +288,14 @@ public class HeapDumpMcpTest {
 
         McpSchema.CallToolRequest oqlRequest = new McpSchema.CallToolRequest("execute_oql", Map.of("query", "select s from java.lang.String s where s.value != null", "max_results", 1));
         McpSchema.CallToolResult oqlResult = tools.call(oqlRequest);
-        String oqlContent = TestMcpContent.text(oqlResult);
+        assertFalse(oqlResult.isError(), oqlResult.toString());
+        List<Map<String, Object>> rows = oqlRows(TestMcpContent.map(oqlResult));
 
-        if (oqlContent.contains("Instance ID:")) {
-            String instanceIdStr = oqlContent.replaceAll(".*Instance ID:\\s*(\\d+).*", "$1");
-            try {
-                long instanceId = Long.parseLong(instanceIdStr);
-                McpSchema.CallToolRequest refsRequest = new McpSchema.CallToolRequest("get_all_references", Map.of("id", instanceId, "from", 0, "to", 10));
-                McpSchema.CallToolResult refsResult = tools.call(refsRequest);
-                assertFalse(refsResult.isError(), "get_all_references should not return error: " + refsResult);
-            } catch (NumberFormatException e) {
-                System.out.println("Could not parse instance ID from OQL result: " + oqlContent);
-            }
+        if (!rows.isEmpty()) {
+            long instanceId = ((Number) rows.get(0).get("instanceId")).longValue();
+            McpSchema.CallToolRequest refsRequest = new McpSchema.CallToolRequest("get_all_references", Map.of("id", instanceId, "from", 0, "to", 10));
+            McpSchema.CallToolResult refsResult = tools.call(refsRequest);
+            assertFalse(refsResult.isError(), "get_all_references should not return error: " + refsResult);
         }
     }
 
@@ -306,6 +306,11 @@ public class HeapDumpMcpTest {
         McpSchema.CallToolRequest request = new McpSchema.CallToolRequest("get_all_references", Map.of("id", 999999999L, "from", 0, "to", 10));
         McpSchema.CallToolResult result = tools.call(request);
         assertFalse(result.isError(), "Should handle non-existent instance gracefully");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> oqlRows(Map<String, Object> result) {
+        return (List<Map<String, Object>>) result.get("rows");
     }
 
     @Test

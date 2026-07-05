@@ -1,6 +1,7 @@
 package com.onpositive.analyzer.mcp;
 
 import com.onpositive.analyzer.HeapDumpService;
+import com.onpositive.analyzer.OqlQueryExecutor;
 import com.onpositive.analyzer.search.Bm25Result;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -152,8 +153,8 @@ public class HeapDumpTools {
         return heapDumpService.getSystemProperties();
     }
 
-    @McpTool(name = "execute_oql", title = "Execute OQL Query", description = "Executes an OQL query on the heap dump. Query syntax example: 'select s.value from java.lang.String s'")
-    public String executeOql(
+    @McpTool(name = "execute_oql", title = "Execute OQL Query", description = "Executes an OQL query on the heap dump. Query syntax example: 'select s.value from java.lang.String s'", generateOutputSchema = true)
+    public OqlQueryExecutor.OqlResult executeOql(
         @McpToolParam(required = true, description = "OQL query to execute against the loaded heap.") String query,
         @McpToolParam(required = false, description = "Maximum number of OQL rows to return.") @Schema(defaultValue = "100", minimum = "0") Integer max_results) throws Exception {
         return heapDumpService.executeOql(query, defaultInt(max_results, 100));

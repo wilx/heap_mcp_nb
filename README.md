@@ -58,7 +58,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `get_all_references` | Get incoming field and array-element references to an instance, including the referring object and field name or array index (paginated) |
 | `get_gc_roots` | View GC root references with pagination (defaults 0-50), including kind and instance info |
 | `get_system_properties` | Access JVM system properties captured in the heap dump |
-| `execute_oql` | Execute OQL queries (e.g., `select s.value from java.lang.String s`) |
+| `execute_oql` | Execute OQL queries and return structured rows (e.g., `select s.value from java.lang.String s`) |
 | `analyze_heap_dump` | One-shot: load a heap dump and return top classes by instance count |
 
 ## Requirements
@@ -158,7 +158,11 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 
 Most typed tools return structured MCP content and advertise JSON output schemas. For example, `get_duplicate_strings` returns an object with fields such as `items`, `totalGroups`, `stringsScanned`, `decodingFailures`, and pagination metadata. Each `items` entry includes fields such as `value`, `occurrenceCount`, `duplicateCount`, `representativeInstanceId`, and shallow-byte totals.
 
-Text-oriented tools remain text responses where the result is inherently free-form, such as `execute_oql` and `analyze_heap_dump`.
+`execute_oql` returns structured rows with fields such as `kind`, `displayValue`, `instanceId`, `className`, `arrayLength`, and `arrayPreview`, depending on whether the row is a scalar value, heap instance, string, or primitive array.
+
+Instance details returned by `get_instance_by_id`, and object instance rows returned by `execute_oql`, expose `fields` as structured entries. Each field entry includes metadata such as `name`, `declaredType`, `kind`, `value`, `referencedInstanceId`, `referencedClassName`, `arrayLength`, and `arrayPreview`.
+
+`analyze_heap_dump` remains a text response because it is a one-shot summary report.
 
 ## Spring AI Tool Registration
 

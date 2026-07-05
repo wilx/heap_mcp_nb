@@ -1,6 +1,5 @@
 package com.onpositive.analyzer;
 
-import com.onpositive.analyzer.printing.InstanceListPrinter;
 import org.junit.jupiter.api.Test;
 import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.Instance;
@@ -16,7 +15,7 @@ import static org.mockito.Mockito.when;
 class HeapDumpServiceBiggestObjectsTest {
 
     @Test
-    void keepsBiggestObjectOrderAndPrintsRetainedSizes() throws Exception {
+    void keepsBiggestObjectOrderAndRetainedSizes() throws Exception {
         Instance largest = instance(1L, "com.example.Largest", 300L);
         Instance second = instance(2L, "com.example.Second", 120L);
         Heap heap = mock(Heap.class);
@@ -27,14 +26,10 @@ class HeapDumpServiceBiggestObjectsTest {
 
         assertEquals(List.of(1L, 2L), result.stream().map(item -> item.instance().getInstanceId()).toList());
         assertEquals(List.of(300L, 120L), result.stream().map(HeapDumpService.RetainedInstance::retainedSize).toList());
-        assertEquals("""
-                ID: 1, Class: com.example.Largest, Retained Size: 300 bytes
-                ID: 2, Class: com.example.Second, Retained Size: 120 bytes""",
-                new InstanceListPrinter().print(result));
     }
 
     @Test
-    void printsPerItemRetainedSizeFailureWithoutSubstitutingShallowSize() throws Exception {
+    void keepsPerItemRetainedSizeFailureWithoutSubstitutingShallowSize() throws Exception {
         Instance instance = instance(3L, "com.example.Broken", 0L);
         when(instance.getRetainedSize()).thenThrow(new IllegalStateException("cannot compute retained size"));
         Heap heap = mock(Heap.class);
@@ -45,8 +40,6 @@ class HeapDumpServiceBiggestObjectsTest {
 
         assertNull(result.get(0).retainedSize());
         assertEquals("cannot compute retained size", result.get(0).retainedSizeError());
-        assertEquals("ID: 3, Class: com.example.Broken, Retained Size Error: cannot compute retained size",
-                new InstanceListPrinter().print(result));
     }
 
     private static HeapDumpService serviceWithHeap(Heap heap) throws Exception {

@@ -1,7 +1,7 @@
 package com.onpositive.analyzer.mcp;
 
 import com.onpositive.analyzer.HeapDumpService;
-import com.onpositive.analyzer.printing.InstanceQuickPrinter;
+import com.onpositive.analyzer.InstanceFieldValues;
 import com.onpositive.analyzer.util.ClassUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.netbeans.lib.profiler.heap.HeapSummary;
@@ -98,8 +98,8 @@ public final class McpDtos {
             long shallowSize,
             @Schema(description = "Whether this instance is directly reported as a GC root.")
             boolean gcRoot,
-            @Schema(description = "Short field-value summary for this instance.")
-            String fields) {
+            @Schema(description = "Structured field values for this instance.")
+            List<InstanceFieldValues.InstanceFieldValue> fields) {
 
         static InstanceDto from(Instance instance) {
             if (instance == null) {
@@ -111,7 +111,7 @@ public final class McpDtos {
                     ClassUtil.getClassName(instance),
                     instance.getSize(),
                     instance.isGCRoot(),
-                    InstanceQuickPrinter.formatFieldsShort(instance));
+                    InstanceFieldValues.from(instance));
         }
 
         static InstanceDto summary(Instance instance) {
@@ -124,7 +124,7 @@ public final class McpDtos {
                     ClassUtil.getClassName(instance),
                     instance.getSize(),
                     instance.isGCRoot(),
-                    "");
+                    List.of());
         }
     }
 

@@ -1,17 +1,6 @@
 package com.onpositive.analyzer;
 
 import com.onpositive.analyzer.mcp.HeapDumpTools;
-import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
-import com.onpositive.analyzer.printing.ClassStatsListPrinter;
-import com.onpositive.analyzer.printing.DuplicateStringBackingArraysPrinter;
-import com.onpositive.analyzer.printing.DuplicateStringsPagePrinter;
-import com.onpositive.analyzer.printing.GCRootInfoListPrinter;
-import com.onpositive.analyzer.printing.HeapSummaryPrinter;
-import com.onpositive.analyzer.printing.InstanceListPrinter;
-import com.onpositive.analyzer.printing.JavaClassListPrinter;
-import com.onpositive.analyzer.printing.JavaClassPrinterWrapper;
-import com.onpositive.analyzer.printing.PropertiesPrinter;
-import com.onpositive.analyzer.printing.ReferenceInfoListPrinter;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.provider.tool.SyncMcpToolProvider;
@@ -145,9 +134,7 @@ public class ToolsFactoryConsistencyTest {
         assertNotNull(specs.get("get_classes_by_regexp").tool().outputSchema());
         assertNotNull(specs.get("get_instances").tool().outputSchema());
         assertNotNull(specs.get("get_duplicate_strings").tool().outputSchema());
-
-        assertNull(specs.get("execute_oql").tool().outputSchema(),
-                "Free-form OQL output remains text-only");
+        assertNotNull(specs.get("execute_oql").tool().outputSchema());
     }
 
     @Test
@@ -163,70 +150,6 @@ public class ToolsFactoryConsistencyTest {
         }
 
         assertTrue(missingDescriptions.isEmpty(), "Missing schema descriptions: " + missingDescriptions);
-    }
-
-    @Test
-    void testPrinterImplementationsExist() {
-        assertDoesNotThrow(HeapSummaryPrinter::new);
-        assertDoesNotThrow(ClassStatsListPrinter::new);
-        assertDoesNotThrow(GCRootInfoListPrinter::new);
-        assertDoesNotThrow(InstanceListPrinter::new);
-        assertDoesNotThrow(JavaClassPrinterWrapper::new);
-        assertDoesNotThrow(JavaClassListPrinter::new);
-        assertDoesNotThrow(PropertiesPrinter::new);
-        assertDoesNotThrow(ReferenceInfoListPrinter::new);
-        assertDoesNotThrow(Bm25ResultListPrinter::new);
-        assertDoesNotThrow(DuplicateStringsPagePrinter::new);
-        assertDoesNotThrow(DuplicateStringBackingArraysPrinter::new);
-    }
-
-    @Test
-    void testClassStatsListPrinter() {
-        ClassStatsListPrinter printer = new ClassStatsListPrinter();
-        List<HeapDumpService.ClassStats> stats = List.of(
-                new HeapDumpService.ClassStats("TestClass", 100, 1000),
-                new HeapDumpService.ClassStats("AnotherClass", 50, 500)
-        );
-        String result = printer.print(stats);
-        assertTrue(result.contains("TestClass"));
-        assertTrue(result.contains("100"));
-        assertTrue(result.contains("AnotherClass"));
-        assertTrue(result.contains("50"));
-    }
-
-    @Test
-    void testGCRootInfoListPrinter() {
-        GCRootInfoListPrinter printer = new GCRootInfoListPrinter();
-        List<HeapDumpService.GCRootInfo> roots = List.of(
-                new HeapDumpService.GCRootInfo("Thread", 123L, "java.lang.Thread")
-        );
-        String result = printer.print(roots);
-        assertTrue(result.contains("Thread"));
-        assertTrue(result.contains("123"));
-        assertTrue(result.contains("java.lang.Thread"));
-    }
-
-    @Test
-    void testReferenceInfoListPrinter() {
-        ReferenceInfoListPrinter printer = new ReferenceInfoListPrinter();
-        List<HeapDumpService.ReferenceInfo> refs = List.of(
-                new HeapDumpService.ReferenceInfo(456L, "ReferencedClass", "fieldName"),
-                new HeapDumpService.ReferenceInfo(789L, "java.lang.Object[]", "[7]")
-        );
-        String result = printer.print(refs);
-        assertTrue(result.contains("Instance ID: 456, Class: ReferencedClass, Via: fieldName"));
-        assertTrue(result.contains("Instance ID: 789, Class: java.lang.Object[], Via: [7]"));
-    }
-
-    @Test
-    void testPropertiesPrinter() {
-        PropertiesPrinter printer = new PropertiesPrinter();
-        java.util.Properties props = new java.util.Properties();
-        props.setProperty("key1", "value1");
-        props.setProperty("key2", "value2");
-        String result = printer.print(props);
-        assertTrue(result.contains("key1=value1"));
-        assertTrue(result.contains("key2=value2"));
     }
 
     @SuppressWarnings("unchecked")

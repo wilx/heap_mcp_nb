@@ -1,11 +1,15 @@
 package com.onpositive.analyzer;
 
-import com.onpositive.analyzer.printing.InstancePrinter;
+import com.onpositive.analyzer.util.ClassUtil;
+import com.onpositive.analyzer.util.ValueUtil;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.netbeans.lib.profiler.heap.*;
 import org.netbeans.modules.profiler.oql.engine.api.OQLEngine;
 
 import javax.script.ScriptEngine;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 public class OqlQueryExecutor {
 
@@ -16,7 +20,7 @@ public class OqlQueryExecutor {
         this.heap = heap;
     }
 
-    public String executeOql(String query, int maxResults) throws Exception {
+    public OqlResult executeOql(String query, int maxResults) throws Exception {
         if (oqlEngine == null) {
             oqlEngine = new OQLEngine(heap);
             patchOqlEngineForFastString(oqlEngine);
@@ -27,8 +31,8 @@ public class OqlQueryExecutor {
             }
         }
 
-        StringBuilder resultBuilder = new StringBuilder();
-        InstancePrinter printer = new InstancePrinter();
+        List<OqlRow> rows = new ArrayList<>();
+        boolean[] truncated = {false};
 
         oqlEngine.executeQuery(query, new OQLEngine.ObjectVisitor() {
             int count = 0;
@@ -37,23 +41,86 @@ public class OqlQueryExecutor {
             public boolean visit(Object o) {
                 count++;
                 if (count > maxResults) {
+                    truncated[0] = true;
                     return false;
                 }
 
-                if (o instanceof Instance) {
-                    resultBuilder.append(String.format("[%d] \"%s\"\n", count, printer.print(o)));
-                } else if (o != null) {
-                    resultBuilder.append(String.format("[%d] %s\n", count, o));
-                }
+                rows.add(toRow(count, o));
                 return true;
             }
         });
 
-        if (resultBuilder.isEmpty()) {
-            return "No results found or empty result set.";
-        }
+        return new OqlResult(rows, rows.size(), maxResults, truncated[0]);
+    }
 
-        return "Query Results:\n" + resultBuilder.toString();
+    private static OqlRow toRow(int index, Object value) {
+        if (value == null) {
+            return new OqlRow(index, "null", "", "null", -1L, "", -1L, false, -1, List.of(), List.of());
+        }
+        if (value instanceof PrimitiveArrayInstance arrayInstance) {
+            String className = ClassUtil.getClassName(arrayInstance);
+            return new OqlRow(index, "primitive_array", className, "Array:" + className,
+                    arrayInstance.getInstanceId(), className, arrayInstance.getSize(), safeIsGCRoot(arrayInstance),
+                    arrayInstance.getLength(), InstanceFieldValues.arrayPreview(arrayInstance), List.of());
+        }
+        if (value instanceof Instance instance) {
+            String className = ClassUtil.getClassName(instance);
+            String kind = "java.lang.String".equals(className) ? "string" : "instance";
+            String displayValue = "java.lang.String".equals(className)
+                    ? String.valueOf(ValueUtil.fastExtractStringValue(instance))
+                    : className;
+            List<InstanceFieldValues.InstanceFieldValue> fields = "java.lang.String".equals(className)
+                    ? List.of()
+                    : InstanceFieldValues.from(instance);
+            return new OqlRow(index, kind, className, displayValue, instance.getInstanceId(), className,
+                    instance.getSize(), safeIsGCRoot(instance), -1, List.of(), fields);
+        }
+        return new OqlRow(index, "value", value.getClass().getName(), String.valueOf(value),
+                -1L, "", -1L, false, -1, List.of(), List.of());
+    }
+
+    private static boolean safeIsGCRoot(Instance instance) {
+        try {
+            return instance.isGCRoot();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    public record OqlResult(
+            @Schema(description = "Rows returned by the OQL query.")
+            List<OqlRow> rows,
+            @Schema(description = "Number of rows returned.")
+            int returnedCount,
+            @Schema(description = "Maximum number of rows requested.")
+            int maxResults,
+            @Schema(description = "Whether additional rows were available but not returned because maxResults was reached.")
+            boolean truncated) {
+    }
+
+    public record OqlRow(
+            @Schema(description = "One-based row index in the OQL result.")
+            int index,
+            @Schema(description = "Result kind: string, primitive_array, instance, value, or null.")
+            String kind,
+            @Schema(description = "Java type or heap class name for the row value.")
+            String valueType,
+            @Schema(description = "Short display value for scalar values, strings, arrays, or instances.")
+            String displayValue,
+            @Schema(description = "Internal heap instance ID, or -1 when the row is not a heap instance.")
+            long instanceId,
+            @Schema(description = "Heap class name for instance and array rows, or empty for scalar values.")
+            String className,
+            @Schema(description = "Shallow size in bytes for instance and array rows, or -1 for scalar values.")
+            long shallowSize,
+            @Schema(description = "Whether the row value is directly reported as a GC root.")
+            boolean gcRoot,
+            @Schema(description = "Array length for primitive array rows, or -1 for other row kinds.")
+            int arrayLength,
+            @Schema(description = "Preview values for primitive array rows, capped at the configured maximum.")
+            List<String> arrayPreview,
+            @Schema(description = "Structured field values for object instance rows, or empty for other row kinds.")
+            List<InstanceFieldValues.InstanceFieldValue> fields) {
     }
 
     private void patchOqlEngineForFastString(OQLEngine oqlEngine) {

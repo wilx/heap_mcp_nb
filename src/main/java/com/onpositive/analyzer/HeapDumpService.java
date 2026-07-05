@@ -9,6 +9,8 @@ import com.onpositive.analyzer.search.InMemoryBm25Index;
 import com.onpositive.analyzer.util.LRUCache;
 import com.onpositive.analyzer.util.ValueUtil;
 import org.netbeans.lib.profiler.heap.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 import static com.onpositive.analyzer.util.ClassUtil.getClassName;
 
 public class HeapDumpService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeapDumpService.class);
 
     private Heap heap;
     private OqlQueryExecutor oqlExecutor;
@@ -447,7 +450,8 @@ public class HeapDumpService {
                         result.setInstanceCount(jc.getInstancesCount());
                         result.setTotalSize(jc.getAllInstancesSize());
                     }
-                } catch (RuntimeException ignored) {
+                } catch (RuntimeException ex) {
+                    LOGGER.debug("Failed to enrich BM25 result for class {}", result.className(), ex);
                 }
             }
             bm25SearchCache.put(cacheKey, fullResults);

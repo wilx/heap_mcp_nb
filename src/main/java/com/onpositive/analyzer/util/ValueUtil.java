@@ -2,11 +2,14 @@ package com.onpositive.analyzer.util;
 
 import org.netbeans.lib.profiler.heap.Instance;
 import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class ValueUtil {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ValueUtil.class);
 
     public record DecodedString(String value, PrimitiveArrayInstance backingArray) {
     }
@@ -79,7 +82,8 @@ public class ValueUtil {
                 }
                 return null;
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException ex) {
+            LOGGER.debug("Cannot decode String instance {}", stringInstance.getInstanceId(), ex);
             return null;
         }
         return null;

@@ -398,6 +398,7 @@ public class HeapDumpService {
         List<JavaClass> classesList = classesByRegexp.get(regexp);
         if (classesList == null) {
             classesList = new ArrayList<>(heap.getJavaClassesByRegExp(regexp));
+            classesByRegexp.put(regexp, classesList);
         }
         int safeTo = Math.min(to, classesList.size());
         int safeFrom = Math.min(from, safeTo);

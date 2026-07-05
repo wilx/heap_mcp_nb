@@ -4,11 +4,13 @@ import com.onpositive.analyzer.search.Bm25Index;
 import com.onpositive.analyzer.search.Bm25Result;
 import org.junit.jupiter.api.Test;
 import org.netbeans.lib.profiler.heap.Heap;
+import org.netbeans.lib.profiler.heap.JavaClass;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class HeapDumpServiceSearchPaginationTest {
@@ -33,12 +35,36 @@ class HeapDumpServiceSearchPaginationTest {
         assertEquals(List.of("Third", "Fourth"), classNames(secondPage));
     }
 
+    @Test
+    void regexpClassPagesReuseCachedFullResult() throws Exception {
+        Heap heap = mock(Heap.class);
+        JavaClass first = javaClass("First");
+        JavaClass second = javaClass("Second");
+        when(heap.getJavaClassesByRegExp(".*Service")).thenReturn(List.of(first, second));
+
+        HeapDumpService service = new HeapDumpService();
+        setField(service, "heap", heap);
+
+        List<JavaClass> firstPage = service.getJavaClassesByRegExpPaginated(".*Service", 0, 1);
+        List<JavaClass> secondPage = service.getJavaClassesByRegExpPaginated(".*Service", 1, 2);
+
+        assertEquals(List.of(first), firstPage);
+        assertEquals(List.of(second), secondPage);
+        verify(heap).getJavaClassesByRegExp(".*Service");
+    }
+
     private static Bm25Result result(String className) {
         return new Bm25Result(className, 1.0, "query", "className", 0, 0);
     }
 
     private static List<String> classNames(List<Bm25Result> results) {
         return results.stream().map(Bm25Result::className).toList();
+    }
+
+    private static JavaClass javaClass(String name) {
+        JavaClass javaClass = mock(JavaClass.class);
+        when(javaClass.getName()).thenReturn(name);
+        return javaClass;
     }
 
     private static void setField(HeapDumpService service, String name, Object value) throws Exception {

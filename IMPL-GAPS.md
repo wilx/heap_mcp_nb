@@ -4,20 +4,7 @@ This file records gaps found while comparing the documented MCP tools with their
 current implementations. The BM25 pagination cache-key issue is not listed
 because it was fixed in commit `9389f7e`.
 
-## 1. Regexp class-search cache is never populated
-
-`HeapDumpService.getJavaClassesByRegExpPaginated` reads from `classesByRegexp`
-but does not put newly fetched results into it. Every cache miss therefore
-remains a miss.
-
-Completion criteria:
-
-- Store the full regexp result list after fetching it from the heap.
-- Keep the cache cleared when a new heap is loaded.
-- Add a test proving repeated pages for the same expression query the heap only
-  once.
-
-## 2. GC-root tools are duplicate APIs
+## 1. GC-root tools are duplicate APIs
 
 `get_gc_roots` and `get_gc_roots_paginated` have the same parameters, delegate
 to the same service method, and use the same printer. Their descriptions differ,
@@ -30,7 +17,7 @@ Completion criteria:
   clearly documented compatibility alias.
 - Ensure the README and compatibility tests reflect that decision.
 
-## 3. Smaller output and metadata defects
+## 2. Smaller output and metadata defects
 
 ### BM25 rank restarts on every page
 

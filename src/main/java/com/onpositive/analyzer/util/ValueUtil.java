@@ -26,6 +26,9 @@ public class ValueUtil {
     public static DecodedString decodeString(Instance stringInstance) {
         if (stringInstance == null) return null;
         Object valueField = stringInstance.getValueOfField("value");
+        // Some heap dumps contain java.lang.String instances whose value field is a
+        // null/zero reference. With no backing char[] or byte[] object, hash/count/offset
+        // metadata is not enough to reconstruct the original text.
         if (!(valueField instanceof PrimitiveArrayInstance array)) return null;
 
         String typeName = array.getJavaClass().getName();

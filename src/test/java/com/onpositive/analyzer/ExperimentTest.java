@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ExperimentTest {
 
     @Test
-    @Disabled("Test for special absolute path hprof file to diagnmose problems when working with it")
+    @Disabled("Manual diagnostic test for a developer-local absolute-path heap dump; not suitable for CI")
     void testGetInstances() throws IOException {
         HeapDumpService service = new HeapDumpService();
         service.loadHeap("D:/work/heap_dump/heapdump-1780452136629.hprof");

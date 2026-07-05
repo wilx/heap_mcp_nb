@@ -4,22 +4,6 @@ This file records gaps found while comparing the documented MCP tools with their
 current implementations. The BM25 pagination cache-key issue is not listed
 because it was fixed in commit `9389f7e`.
 
-## 1. Smaller output and metadata defects
-
-### Coverage is weak around failure-prone heap operations
-
-Some integration and diagnostic tests are disabled, including the biggest
-objects integration test. Reflection schema tests currently verify only basic
-types and required status.
-
-Completion criteria:
-
-- Replace avoidable disabled tests with deterministic unit tests using Mockito.
-- Keep fixture-dependent integration tests separate and state why each disabled
-  test cannot run in the normal suite.
-- Add MCP-level tests for error flags and output fields, not only tool
-  registration.
-
 ## Follow-up: consider MCP Java SDK 2.x migration
 
 This is not a correctness gap in the current implementation. MCP Java SDK 2.x

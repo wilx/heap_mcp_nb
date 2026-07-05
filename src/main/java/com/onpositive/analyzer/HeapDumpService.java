@@ -6,8 +6,9 @@ import com.onpositive.analyzer.search.ClassNameTokenizer;
 import com.onpositive.analyzer.search.DefaultClassSkippedPredicate;
 import com.onpositive.analyzer.search.HeapDumpBm25Indexer;
 import com.onpositive.analyzer.search.InMemoryBm25Index;
-import com.onpositive.analyzer.util.LRUCache;
 import com.onpositive.analyzer.util.ValueUtil;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.netbeans.lib.profiler.heap.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +34,14 @@ public class HeapDumpService {
     private OqlQueryExecutor oqlExecutor;
     private List<ClassStats> classesSortedByCount;
     private List<ClassStats> classesSortedBySize;
-    private final LRUCache<String, List<JavaClass>> classesByRegexp = new LRUCache<>(10);
+    private final Cache<String, List<JavaClass>> classesByRegexp = Caffeine.newBuilder()
+            .maximumSize(10)
+            .build();
 
     private Bm25Index bm25Index;
-    private final LRUCache<String, List<Bm25Result>> bm25SearchCache = new LRUCache<>(20);
+    private final Cache<String, List<Bm25Result>> bm25SearchCache = Caffeine.newBuilder()
+            .maximumSize(20)
+            .build();
     private DuplicateStringsAnalysis duplicateStringsAnalysis;
 
     public static class InstancePage {
@@ -152,9 +157,9 @@ public class HeapDumpService {
         oqlExecutor = null;
         classesSortedByCount = null;
         classesSortedBySize = null;
-        classesByRegexp.clear();
+        classesByRegexp.invalidateAll();
         bm25Index = null;
-        bm25SearchCache.clear();
+        bm25SearchCache.invalidateAll();
         duplicateStringsAnalysis = null;
     }
 
@@ -397,7 +402,7 @@ public class HeapDumpService {
     public List<JavaClass> getJavaClassesByRegExpPaginated(String regexp, int from, int to) {
         validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
-        List<JavaClass> classesList = classesByRegexp.get(regexp);
+        List<JavaClass> classesList = classesByRegexp.getIfPresent(regexp);
         if (classesList == null) {
             classesList = new ArrayList<>(heap.getJavaClassesByRegExp(regexp));
             classesByRegexp.put(regexp, classesList);
@@ -474,7 +479,7 @@ public class HeapDumpService {
         }
 
         String cacheKey = query + "|" + topN + "|" + from;
-        List<Bm25Result> fullResults = bm25SearchCache.get(cacheKey);
+        List<Bm25Result> fullResults = bm25SearchCache.getIfPresent(cacheKey);
         if (fullResults == null) {
             fullResults = bm25Index.search(query, Math.max(topN + from, topN));
             for (Bm25Result result : fullResults) {

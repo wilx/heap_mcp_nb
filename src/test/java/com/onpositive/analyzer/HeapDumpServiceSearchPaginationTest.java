@@ -33,6 +33,8 @@ class HeapDumpServiceSearchPaginationTest {
 
         assertEquals(List.of("First", "Second"), classNames(firstPage));
         assertEquals(List.of("Third", "Fourth"), classNames(secondPage));
+        assertEquals(3, secondPage.get(0).rank());
+        assertEquals(4, secondPage.get(1).rank());
     }
 
     @Test

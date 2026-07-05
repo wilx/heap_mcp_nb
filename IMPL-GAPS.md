@@ -6,14 +6,6 @@ because it was fixed in commit `9389f7e`.
 
 ## 1. Smaller output and metadata defects
 
-### BM25 rank restarts on every page
-
-`Bm25ResultListPrinter` always starts rank numbering at 1 and receives no page
-offset. Later pages therefore display incorrect global ranks.
-
-Completion criteria: carry the offset into the printable result or return a
-page object that includes it, then test a non-zero `from`.
-
 ### Server version differs from the artifact version
 
 `McpServerLauncher` advertises version `0.0.1`, while `pom.xml` and documented

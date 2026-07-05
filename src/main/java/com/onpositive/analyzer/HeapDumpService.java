@@ -491,6 +491,9 @@ public class HeapDumpService {
 
         int safeFrom = Math.min(from, fullResults.size());
         int safeTo = Math.min(safeFrom + topN, fullResults.size());
+        for (int i = safeFrom; i < safeTo; i++) {
+            fullResults.get(i).setRank(i + 1);
+        }
         return fullResults.subList(safeFrom, safeTo);
     }
 

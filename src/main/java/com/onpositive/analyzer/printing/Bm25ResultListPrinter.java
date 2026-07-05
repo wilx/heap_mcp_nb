@@ -31,11 +31,13 @@ public class Bm25ResultListPrinter implements IValuePrinter {
                 sb.append("... (truncated)\n");
                 break;
             }
+            int displayRank = r.rank() > 0 ? r.rank() : rank;
             sb.append(String.format(Locale.US, "%-5d | %-10.2f | %-60s | %-15s | %-20s%n",
-                    rank++, r.score(),
+                    displayRank, r.score(),
                     truncate(r.className(), 60),
                     r.topField(),
                     r.matchedTerms()));
+            rank++;
             shown++;
         }
         return sb.toString();

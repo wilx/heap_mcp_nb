@@ -8,6 +8,7 @@ public class Bm25Result {
     private final String topField;
     private long instanceCount;
     private long totalSize;
+    private int rank;
 
     public Bm25Result(String className, double score, String matchedTerms,
                       String topField, long instanceCount, long totalSize) {
@@ -43,12 +44,20 @@ public class Bm25Result {
         return totalSize;
     }
 
+    public int rank() {
+        return rank;
+    }
+
     public void setInstanceCount(long instanceCount) {
         this.instanceCount = instanceCount;
     }
 
     public void setTotalSize(long totalSize) {
         this.totalSize = totalSize;
+    }
+
+    public void setRank(int rank) {
+        this.rank = rank;
     }
 
     @Override
@@ -60,6 +69,7 @@ public class Bm25Result {
                 ", topField='" + topField + '\'' +
                 ", instanceCount=" + instanceCount +
                 ", totalSize=" + totalSize +
+                ", rank=" + rank +
                 '}';
     }
 }

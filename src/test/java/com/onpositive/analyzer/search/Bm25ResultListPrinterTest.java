@@ -48,6 +48,18 @@ class Bm25ResultListPrinterTest {
     }
 
     @Test
+    void print_usesGlobalRankWhenPresent() {
+        Bm25Result resultOnLaterPage = new Bm25Result(
+                "com.example.LaterPageService", 3.0, "later", "className", 1, 100);
+        resultOnLaterPage.setRank(26);
+
+        String result = printer.print(List.of(resultOnLaterPage));
+
+        assertTrue(result.contains("26    |"));
+        assertFalse(result.contains("1     |"));
+    }
+
+    @Test
     void print_nonListInput_returnsEmpty() {
         assertEquals("", printer.print("not a list"));
         assertEquals("", printer.print(null));

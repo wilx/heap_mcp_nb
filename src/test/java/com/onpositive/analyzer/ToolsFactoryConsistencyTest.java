@@ -149,6 +149,17 @@ public class ToolsFactoryConsistencyTest {
     }
 
     @Test
+    void gcRootsPaginatedToolRemainsCompatibilityAlias() {
+        ToolsGetter getter = new ToolsGetter(tools);
+        SyncToolSpecification canonical = getter.getGCRootsTool();
+        SyncToolSpecification alias = getter.getGCRootsPaginatedTool();
+
+        assertEquals(canonical.tool().inputSchema(), alias.tool().inputSchema());
+        assertTrue(canonical.tool().description().contains("Canonical tool"));
+        assertTrue(alias.tool().description().contains("Compatibility alias for get_gc_roots"));
+    }
+
+    @Test
     void testPrinterImplementationsExist() {
         assertDoesNotThrow(HeapSummaryPrinter::new);
         assertDoesNotThrow(ClassStatsListPrinter::new);

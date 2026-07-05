@@ -4,20 +4,7 @@ This file records gaps found while comparing the documented MCP tools with their
 current implementations. The BM25 pagination cache-key issue is not listed
 because it was fixed in commit `9389f7e`.
 
-## 1. GC-root tools are duplicate APIs
-
-`get_gc_roots` and `get_gc_roots_paginated` have the same parameters, delegate
-to the same service method, and use the same printer. Their descriptions differ,
-but their behavior does not.
-
-Completion criteria:
-
-- Choose one canonical tool name.
-- Either remove the duplicate in the next breaking release or retain it as a
-  clearly documented compatibility alias.
-- Ensure the README and compatibility tests reflect that decision.
-
-## 2. Smaller output and metadata defects
+## 1. Smaller output and metadata defects
 
 ### BM25 rank restarts on every page
 

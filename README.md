@@ -54,8 +54,8 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `get_instance_retained_size` | Compute retained size of an instance by ID (separate from `get_instance_by_id` since retained size computation is costly and may fail) |
 | `get_biggest_objects` | Find largest objects by retained size |
 | `get_all_references` | Get incoming field and array-element references to an instance, including the referring object and field name or array index (paginated) |
-| `get_gc_roots` | View GC root references with pagination (defaults 0-50) |
-| `get_gc_roots_paginated` | View GC roots with pagination, including kind and instance info |
+| `get_gc_roots` | Canonical tool for viewing GC root references with pagination (defaults 0-50), including kind and instance info |
+| `get_gc_roots_paginated` | Compatibility alias for `get_gc_roots`; returns the same paginated GC root data |
 | `get_system_properties` | Access JVM system properties captured in the heap dump |
 | `execute_oql` | Execute OQL queries (e.g., `select s.value from java.lang.String s`) |
 | `analyze_heap_dump` | One-shot: load a heap dump and return top classes by instance count |

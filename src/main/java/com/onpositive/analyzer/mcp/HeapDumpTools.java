@@ -50,7 +50,7 @@ public class HeapDumpTools {
         return heapDumpService.getBiggestObjectsByRetainedSize(limit);
     }
 
-    @Tool(name = "get_gc_roots", title = "Get GC Roots", decription = "Returns the GC roots of the loaded heap.")
+    @Tool(name = "get_gc_roots", title = "Get GC Roots", decription = "Canonical tool for returning GC roots with pagination, including kind and instance information.")
     @Printer(impl = GCRootInfoListPrinter.class)
     public List<HeapDumpService.GCRootInfo> getGCRoots(
             @Default(name = "from", value = "0", description = "Zero-based start offset, inclusive.", minimum = 0) int from,
@@ -58,7 +58,7 @@ public class HeapDumpTools {
         return heapDumpService.getGCRootsPaginated(from, to);
     }
 
-    @Tool(name = "get_gc_roots_paginated", title = "Get GC Roots Paginated", decription = "Returns GC roots with pagination, including kind and instance information.")
+    @Tool(name = "get_gc_roots_paginated", title = "Get GC Roots Paginated", decription = "Compatibility alias for get_gc_roots. Returns the same paginated GC root data.")
     @Printer(impl = GCRootInfoListPrinter.class)
     public List<HeapDumpService.GCRootInfo> getGCRootsPaginated(
             @Default(name = "from", value = "0", description = "Zero-based start offset, inclusive.", minimum = 0) int from,

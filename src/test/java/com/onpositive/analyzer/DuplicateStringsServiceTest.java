@@ -41,10 +41,33 @@ class DuplicateStringsServiceTest {
     }
 
     @Test
+    void returnsBackingArrayDetailsByRepresentativeId() throws Exception {
+        HeapDumpService service = new HeapDumpService();
+        service.loadHeap(SAMPLE);
+        HeapDumpService.DuplicateStringStats first =
+                service.getDuplicateStrings("duplicate_count", 0, 1, 20).items.getFirst();
+
+        HeapDumpService.DuplicateStringBackingArrays details =
+                service.getDuplicateStringBackingArrays(first.representativeInstanceId, 20);
+
+        assertEquals(first.value, details.value);
+        assertEquals(first.occurrenceCount, details.occurrenceCount);
+        assertEquals(first.distinctBackingArrayCount, details.backingArrays.size());
+        assertEquals(first.backingArrayShallowBytes,
+                details.backingArrays.stream().mapToLong(item -> item.shallowSize).sum());
+        assertEquals(first.occurrenceCount,
+                details.backingArrays.stream().mapToLong(item -> item.stringInstanceIds.size()).sum());
+        assertTrue(details.backingArrays.stream().allMatch(item -> item.backingArrayId > 0));
+        assertTrue(details.backingArrays.stream().allMatch(item -> !item.stringInstanceIds.isEmpty()));
+    }
+
+    @Test
     void rejectsInvalidArguments() throws Exception {
         HeapDumpService service = new HeapDumpService();
         assertThrows(IllegalStateException.class,
                 () -> service.getDuplicateStrings("total_bytes", 0, 1, 20));
+        assertThrows(IllegalStateException.class,
+                () -> service.getDuplicateStringBackingArrays(1L, 20));
         service.loadHeap(SAMPLE);
         assertThrows(IllegalArgumentException.class,
                 () -> service.getDuplicateStrings("unknown", 0, 1, 20));
@@ -52,6 +75,10 @@ class DuplicateStringsServiceTest {
                 () -> service.getDuplicateStrings("total_bytes", 2, 1, 20));
         assertThrows(IllegalArgumentException.class,
                 () -> service.getDuplicateStrings("total_bytes", 0, 1, -1));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.getDuplicateStringBackingArrays(-1L, -1));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.getDuplicateStringBackingArrays(1L, 20));
     }
 
     @Test

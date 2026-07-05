@@ -50,6 +50,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `search_classes` | Full-text search classes using BM25 ranking on names, fields, superclass; splits CamelCase/snake_case, filters stopwords |
 | `get_instances` | Paginate through instances of a class by class name (defaults 10 per page) |
 | `get_duplicate_strings` | Group exact duplicate strings and sort by `total_bytes` or `duplicate_count` (paginated, escaped preview defaults to 200 characters) |
+| `get_duplicate_string_backing_arrays` | Drill into one duplicate string group by `representative_id`, returning each unique backing array and the String instance IDs that reference it |
 | `get_instance_by_id` | Get instance details including class, shallow size, field values, and object references |
 | `get_instance_retained_size` | Compute retained size of an instance by ID (separate from `get_instance_by_id` since retained size computation is costly and may fail) |
 | `get_biggest_objects` | Find largest objects by retained size |
@@ -144,13 +145,14 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 3. get_classes_by_max_instances_count()     → Top classes by count
 4. get_class_by_name(name="com.example.MyLeakyClass")  → Inspect a suspicious class
 5. get_duplicate_strings(sort_by="total_bytes") → Find repeated string values and representative IDs
-6. get_instances(class_name="com.example.MyLeakyClass", from=0, to=5)  → Browse instances
-7. get_instance_by_id(id=12345)             → Full shallow-size details of a specific instance
-8. get_instance_retained_size(id=12345)     → Compute retained size (costly, separate call)
-9. get_all_references(id=12345)             → Find what holds this instance
+6. get_duplicate_string_backing_arrays(representative_id=12345) → List unique backing arrays for one duplicate string group
+7. get_instances(class_name="com.example.MyLeakyClass", from=0, to=5)  → Browse instances
+8. get_instance_by_id(id=12345)             → Full shallow-size details of a specific instance
+9. get_instance_retained_size(id=12345)     → Compute retained size (costly, separate call)
+10. get_all_references(id=12345)            → Find what holds this instance
 ```
 
-`get_duplicate_strings` reports raw shallow bytes associated with the String objects and their distinct backing arrays. These figures are not retained size or estimated savings. Backing arrays shared by legacy substring spans can appear in more than one value group, so totals across rows are not necessarily additive. Use `execute_oql` for arbitrary string conditions and the representative instance ID with the existing instance/reference tools for drill-down.
+`get_duplicate_strings` reports raw shallow bytes associated with the String objects and their distinct backing arrays. Within one duplicate-string group, backing arrays are deduplicated before contributing to `backing_bytes` and `total_bytes`. These figures are not retained size or estimated savings. Backing arrays shared by legacy substring spans can appear in more than one value group, so totals across rows are not necessarily additive. Use `get_duplicate_string_backing_arrays` with a row's `representative_id` to list the unique backing arrays and the String instance IDs that reference them.
 
 ### Tool Response Format
 

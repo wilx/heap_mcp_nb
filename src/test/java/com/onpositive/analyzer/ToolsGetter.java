@@ -82,6 +82,10 @@ public class ToolsGetter {
         return get("get_duplicate_strings");
     }
 
+    public McpServerFeatures.SyncToolSpecification getDuplicateStringBackingArraysTool() {
+        return get("get_duplicate_string_backing_arrays");
+    }
+
     public McpServerFeatures.SyncToolSpecification executeOqlTool() {
         return get("execute_oql");
     }

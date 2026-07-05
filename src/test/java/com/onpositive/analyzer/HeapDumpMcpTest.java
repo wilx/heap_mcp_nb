@@ -15,10 +15,11 @@ public class HeapDumpMcpTest {
 
     private ToolsGetter toolsGetter;
     private String samplePath;
+    private HeapDumpService service;
 
     @BeforeEach
     void setUp() {
-        HeapDumpService service = new HeapDumpService();
+        service = new HeapDumpService();
         HeapDumpTools tools = new HeapDumpTools(service);
         toolsGetter = new ToolsGetter(tools);
         File sampleFile = new File("src/test/resources/HeapDumpSample.hprof");
@@ -121,9 +122,30 @@ public class HeapDumpMcpTest {
         String content = ((McpSchema.TextContent) result.content().get(0)).text();
         assertTrue(content.contains("Duplicate string groups:"));
         assertTrue(content.contains("occurrences="));
-        assertTrue(content.contains("duplicates="));
+        assertFalse(content.contains("duplicates="));
         assertTrue(content.contains("representative_id="));
+        assertFalse(content.contains("representative_backing_array_id="));
         assertTrue(content.contains("total_bytes="));
+    }
+
+    @Test
+    void testGetDuplicateStringBackingArraysAfterLoad() {
+        toolsGetter.loadHeapTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+        HeapDumpService.DuplicateStringStats first = service
+                .getDuplicateStrings("duplicate_count", 0, 1, 20).items.getFirst();
+
+        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringBackingArraysTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("get_duplicate_string_backing_arrays", Map.of(
+                        "representative_id", Long.toString(first.representativeInstanceId),
+                        "max_value_length", 20)));
+
+        assertFalse(result.isError());
+        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        assertTrue(content.contains("Duplicate string backing arrays"));
+        assertTrue(content.contains("representative_id=" + first.representativeInstanceId));
+        assertTrue(content.contains("backing_array_id="));
+        assertTrue(content.contains("string_instance_ids="));
     }
 
     @Test

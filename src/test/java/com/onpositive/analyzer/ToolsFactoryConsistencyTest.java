@@ -5,6 +5,7 @@ import com.onpositive.analyzer.mcp.reflection.Tool;
 import com.onpositive.analyzer.mcp.reflection.ToolsFactory;
 import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
 import com.onpositive.analyzer.printing.ClassStatsListPrinter;
+import com.onpositive.analyzer.printing.DuplicateStringBackingArraysPrinter;
 import com.onpositive.analyzer.printing.DuplicateStringsPagePrinter;
 import com.onpositive.analyzer.printing.GCRootInfoListPrinter;
 import com.onpositive.analyzer.printing.HeapSummaryPrinter;
@@ -72,6 +73,7 @@ public class ToolsFactoryConsistencyTest {
         assertTrue(specsMap.containsKey("analyze_heap_dump"), "Should have analyze_heap_dump tool");
         assertTrue(specsMap.containsKey("search_classes"), "Should have search_classes tool");
         assertTrue(specsMap.containsKey("get_duplicate_strings"), "Should have get_duplicate_strings tool");
+        assertTrue(specsMap.containsKey("get_duplicate_string_backing_arrays"), "Should have get_duplicate_string_backing_arrays tool");
     }
 
     @Test
@@ -114,6 +116,16 @@ public class ToolsFactoryConsistencyTest {
         assertEquals(200, property(inputSchema, "max_value_length").get("default"));
         assertEquals(0L, property(inputSchema, "max_value_length").get("minimum"));
 
+        SyncToolSpecification duplicateStringBackingArraysSpec = specs.stream()
+                .filter(s -> s.tool().name().equals("get_duplicate_string_backing_arrays"))
+                .findFirst()
+                .orElseThrow();
+
+        inputSchema = duplicateStringBackingArraysSpec.tool().inputSchema();
+        assertTrue(required(inputSchema).contains("representative_id"));
+        assertEquals(200, property(inputSchema, "max_value_length").get("default"));
+        assertEquals(0L, property(inputSchema, "max_value_length").get("minimum"));
+
         SyncToolSpecification biggestObjectsSpec = specs.stream()
                 .filter(s -> s.tool().name().equals("get_biggest_objects"))
                 .findFirst()
@@ -145,6 +157,7 @@ public class ToolsFactoryConsistencyTest {
         assertNotNull(getter.analyzeHeapTool());
         assertNotNull(getter.searchClassesTool());
         assertNotNull(getter.getDuplicateStringsTool());
+        assertNotNull(getter.getDuplicateStringBackingArraysTool());
     }
 
     @Test
@@ -170,6 +183,7 @@ public class ToolsFactoryConsistencyTest {
         assertDoesNotThrow(ReferenceInfoListPrinter::new);
         assertDoesNotThrow(Bm25ResultListPrinter::new);
         assertDoesNotThrow(DuplicateStringsPagePrinter::new);
+        assertDoesNotThrow(DuplicateStringBackingArraysPrinter::new);
     }
 
     @Test

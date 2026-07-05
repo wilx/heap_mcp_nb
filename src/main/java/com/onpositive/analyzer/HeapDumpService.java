@@ -81,6 +81,7 @@ public class HeapDumpService {
         public final int distinctBackingArrayCount;
         public final long backingArrayShallowBytes;
         public final long totalShallowBytes;
+        private final List<DuplicateStringBackingArray> backingArrays;
 
         private DuplicateStringStats(String value, MutableDuplicateStringStats stats) {
             this.value = value;
@@ -91,8 +92,50 @@ public class HeapDumpService {
             this.stringShallowBytes = stats.stringShallowBytes;
             this.distinctBackingArrayCount = stats.backingArrays.size();
             this.backingArrayShallowBytes = stats.backingArrays.values().stream()
-                    .mapToLong(Long::longValue).sum();
+                    .mapToLong(backingArray -> backingArray.shallowSize).sum();
             this.totalShallowBytes = stringShallowBytes + backingArrayShallowBytes;
+            this.backingArrays = stats.backingArrays.values().stream()
+                    .map(MutableDuplicateStringBackingArray::toImmutable)
+                    .sorted(Comparator.comparingLong(item -> item.backingArrayId))
+                    .toList();
+        }
+    }
+
+    public static class DuplicateStringBackingArray {
+        public final long backingArrayId;
+        public final long shallowSize;
+        public final List<Long> stringInstanceIds;
+
+        private DuplicateStringBackingArray(long backingArrayId, long shallowSize, List<Long> stringInstanceIds) {
+            this.backingArrayId = backingArrayId;
+            this.shallowSize = shallowSize;
+            this.stringInstanceIds = stringInstanceIds;
+        }
+    }
+
+    public static class DuplicateStringBackingArrays {
+        public final String value;
+        public final long occurrenceCount;
+        public final int stringLength;
+        public final long representativeInstanceId;
+        public final long stringShallowBytes;
+        public final int distinctBackingArrayCount;
+        public final long backingArrayShallowBytes;
+        public final long totalShallowBytes;
+        public final int maxValueLength;
+        public final List<DuplicateStringBackingArray> backingArrays;
+
+        private DuplicateStringBackingArrays(DuplicateStringStats stats, int maxValueLength) {
+            this.value = stats.value;
+            this.occurrenceCount = stats.occurrenceCount;
+            this.stringLength = stats.stringLength;
+            this.representativeInstanceId = stats.representativeInstanceId;
+            this.stringShallowBytes = stats.stringShallowBytes;
+            this.distinctBackingArrayCount = stats.distinctBackingArrayCount;
+            this.backingArrayShallowBytes = stats.backingArrayShallowBytes;
+            this.totalShallowBytes = stats.totalShallowBytes;
+            this.maxValueLength = maxValueLength;
+            this.backingArrays = stats.backingArrays;
         }
     }
 
@@ -124,7 +167,25 @@ public class HeapDumpService {
         long occurrenceCount;
         long representativeInstanceId = Long.MAX_VALUE;
         long stringShallowBytes;
-        final Map<Long, Long> backingArrays = new HashMap<>();
+        final Map<Long, MutableDuplicateStringBackingArray> backingArrays = new HashMap<>();
+    }
+
+    private static class MutableDuplicateStringBackingArray {
+        final long backingArrayId;
+        final long shallowSize;
+        final List<Long> stringInstanceIds = new ArrayList<>();
+
+        MutableDuplicateStringBackingArray(long backingArrayId, long shallowSize) {
+            this.backingArrayId = backingArrayId;
+            this.shallowSize = shallowSize;
+        }
+
+        DuplicateStringBackingArray toImmutable() {
+            return new DuplicateStringBackingArray(
+                    backingArrayId,
+                    shallowSize,
+                    stringInstanceIds.stream().sorted().toList());
+        }
     }
 
     private static class DuplicateStringsAnalysis {
@@ -132,14 +193,17 @@ public class HeapDumpService {
         final long decodingFailures;
         final List<DuplicateStringStats> byTotalBytes;
         final List<DuplicateStringStats> byDuplicateCount;
+        final Map<Long, DuplicateStringStats> byRepresentativeInstanceId;
 
         DuplicateStringsAnalysis(long stringsScanned, long decodingFailures,
                                  List<DuplicateStringStats> byTotalBytes,
-                                 List<DuplicateStringStats> byDuplicateCount) {
+                                 List<DuplicateStringStats> byDuplicateCount,
+                                 Map<Long, DuplicateStringStats> byRepresentativeInstanceId) {
             this.stringsScanned = stringsScanned;
             this.decodingFailures = decodingFailures;
             this.byTotalBytes = byTotalBytes;
             this.byDuplicateCount = byDuplicateCount;
+            this.byRepresentativeInstanceId = byRepresentativeInstanceId;
         }
     }
 
@@ -186,10 +250,24 @@ public class HeapDumpService {
                 sorted.size(), safeFrom, safeTo, sorted.size() - safeTo, maxValueLength);
     }
 
+    public DuplicateStringBackingArrays getDuplicateStringBackingArrays(long representativeId, int maxValueLength) {
+        validateNonNegative("max_value_length", maxValueLength);
+        if (heap == null) throw new IllegalStateException("Heap not loaded");
+        if (duplicateStringsAnalysis == null) {
+            duplicateStringsAnalysis = analyzeDuplicateStrings();
+        }
+
+        DuplicateStringStats stats = duplicateStringsAnalysis.byRepresentativeInstanceId.get(representativeId);
+        if (stats == null) {
+            throw new IllegalArgumentException("No duplicate string group found for representative_id: " + representativeId);
+        }
+        return new DuplicateStringBackingArrays(stats, maxValueLength);
+    }
+
     private DuplicateStringsAnalysis analyzeDuplicateStrings() {
         JavaClass stringClass = heap.getJavaClassByName("java.lang.String");
         if (stringClass == null) {
-            return new DuplicateStringsAnalysis(0, 0, List.of(), List.of());
+            return new DuplicateStringsAnalysis(0, 0, List.of(), List.of(), Map.of());
         }
 
         Map<String, MutableDuplicateStringStats> grouped = new HashMap<>();
@@ -216,7 +294,10 @@ public class HeapDumpService {
             stats.representativeInstanceId = Math.min(
                     stats.representativeInstanceId, instance.getInstanceId());
             PrimitiveArrayInstance backing = decoded.backingArray();
-            stats.backingArrays.putIfAbsent(backing.getInstanceId(), backing.getSize());
+            stats.backingArrays.computeIfAbsent(
+                    backing.getInstanceId(),
+                    ignored -> new MutableDuplicateStringBackingArray(backing.getInstanceId(), backing.getSize()))
+                    .stringInstanceIds.add(instance.getInstanceId());
         }
 
         List<DuplicateStringStats> duplicateGroups = grouped.entrySet().stream()
@@ -240,7 +321,10 @@ public class HeapDumpService {
 
         return new DuplicateStringsAnalysis(scanned, failures,
                 duplicateGroups.stream().sorted(byTotalBytes).toList(),
-                duplicateGroups.stream().sorted(byDuplicateCount).toList());
+                duplicateGroups.stream().sorted(byDuplicateCount).toList(),
+                duplicateGroups.stream().collect(Collectors.toMap(
+                        stats -> stats.representativeInstanceId,
+                        stats -> stats)));
     }
 
     public List<ClassStats> getClassesByMaxInstancesCount(int from, int to) {

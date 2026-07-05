@@ -26,7 +26,6 @@ public class DuplicateStringsPagePrinter implements IValuePrinter {
         for (DuplicateStringStats stats : page.items) {
             result.append("\n[").append(rank++).append("] ")
                     .append("occurrences=").append(stats.occurrenceCount)
-                    .append(", duplicates=").append(stats.duplicateCount)
                     .append(", length=").append(stats.stringLength)
                     .append(", representative_id=").append(stats.representativeInstanceId)
                     .append(", string_bytes=").append(stats.stringShallowBytes)

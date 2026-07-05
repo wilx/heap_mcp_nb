@@ -108,6 +108,38 @@ public class HeapDumpMcpTest {
     }
 
     @Test
+    void testGetDuplicateStringsAfterLoad() {
+        toolsGetter.loadHeapTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+
+        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringsTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("get_duplicate_strings", Map.of(
+                        "sort_by", "duplicate_count", "from", 0, "to", 5,
+                        "max_value_length", 20)));
+
+        assertFalse(result.isError());
+        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        assertTrue(content.contains("Duplicate string groups:"));
+        assertTrue(content.contains("occurrences="));
+        assertTrue(content.contains("duplicates="));
+        assertTrue(content.contains("representative_id="));
+        assertTrue(content.contains("total_bytes="));
+    }
+
+    @Test
+    void testGetDuplicateStringsRejectsInvalidSort() {
+        toolsGetter.loadHeapTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath)));
+
+        McpSchema.CallToolResult result = toolsGetter.getDuplicateStringsTool().callHandler().apply(null,
+                new McpSchema.CallToolRequest("get_duplicate_strings", Map.of("sort_by", "retained_size")));
+
+        assertTrue(result.isError());
+        String content = ((McpSchema.TextContent) result.content().get(0)).text();
+        assertTrue(content.contains("sort_by"));
+    }
+
+    @Test
     void testAnalyzeHeapDump() {
         McpSchema.CallToolResult result = toolsGetter.analyzeHeapTool().callHandler().apply(null, new McpSchema.CallToolRequest("analyze_heap_dump", Map.of(
                 "file_path", samplePath,

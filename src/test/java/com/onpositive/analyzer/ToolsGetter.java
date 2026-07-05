@@ -78,6 +78,10 @@ public class ToolsGetter {
         return get("get_system_properties");
     }
 
+    public McpServerFeatures.SyncToolSpecification getDuplicateStringsTool() {
+        return get("get_duplicate_strings");
+    }
+
     public McpServerFeatures.SyncToolSpecification executeOqlTool() {
         return get("execute_oql");
     }

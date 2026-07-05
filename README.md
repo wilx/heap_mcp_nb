@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 - **Load Heap Dumps** - Parse and load .hprof heap dump files
 - **Class Analysis** - Browse classes sorted by instance count/size, search by exact name, regex, or BM25 full-text ranking
 - **Instance Analysis** - Get instance details with field values, paginate through instances by class, compute retained size (separate tool to isolate costly computation)
+- **Duplicate String Analysis** - Group equal strings and rank them by count or associated shallow footprint
 - **References** - Get all references to an instance with pagination
 - **GC Root Analysis** - View garbage collection roots with pagination
 - **Heap Summary & Properties** - Get overview statistics and JVM system properties from the heap dump
@@ -48,6 +49,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `get_classes_by_regexp` | Search classes matching a regular expression (paginated) |
 | `search_classes` | Full-text search classes using BM25 ranking on names, fields, superclass; splits CamelCase/snake_case, filters stopwords |
 | `get_instances` | Paginate through instances of a class by class name (defaults 10 per page) |
+| `get_duplicate_strings` | Group exact duplicate strings and sort by `total_bytes` or `duplicate_count` (paginated, escaped preview defaults to 200 characters) |
 | `get_instance_by_id` | Get instance details including field values and object references |
 | `get_instance_retained_size` | Compute retained size of an instance by ID (separate from `get_instance_by_id` since retained size computation is costly and may fail) |
 | `get_biggest_objects` | Find largest objects by retained size |
@@ -141,11 +143,14 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 2. get_summary()                            → Overview statistics
 3. get_classes_by_max_instances_count()     → Top classes by count
 4. get_class_by_name(name="com.example.MyLeakyClass")  → Inspect a suspicious class
-5. get_instances(class_name="com.example.MyLeakyClass", from=0, to=5)  → Browse instances
-6. get_instance_by_id(id=12345)             → Full details of a specific instance
-7. get_instance_retained_size(id=12345)     → Compute retained size (costly, separate call)
-8. get_all_references(id=12345)             → Find what holds this instance
+5. get_duplicate_strings(sort_by="total_bytes") → Find repeated string values and representative IDs
+6. get_instances(class_name="com.example.MyLeakyClass", from=0, to=5)  → Browse instances
+7. get_instance_by_id(id=12345)             → Full details of a specific instance
+8. get_instance_retained_size(id=12345)     → Compute retained size (costly, separate call)
+9. get_all_references(id=12345)             → Find what holds this instance
 ```
+
+`get_duplicate_strings` reports raw shallow bytes associated with the String objects and their distinct backing arrays. These figures are not retained size or estimated savings. Backing arrays shared by legacy substring spans can appear in more than one value group, so totals across rows are not necessarily additive. Use `execute_oql` for arbitrary string conditions and the representative instance ID with the existing instance/reference tools for drill-down.
 
 ### Tool Response Format
 

@@ -7,6 +7,7 @@ import com.onpositive.analyzer.search.DefaultClassSkippedPredicate;
 import com.onpositive.analyzer.search.HeapDumpBm25Indexer;
 import com.onpositive.analyzer.search.InMemoryBm25Index;
 import com.onpositive.analyzer.util.LRUCache;
+import com.onpositive.analyzer.util.ValueUtil;
 import org.netbeans.lib.profiler.heap.*;
 
 import java.io.File;
@@ -14,7 +15,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -30,6 +34,7 @@ public class HeapDumpService {
 
     private Bm25Index bm25Index;
     private final LRUCache<String, List<Bm25Result>> bm25SearchCache = new LRUCache<>(20);
+    private DuplicateStringsAnalysis duplicateStringsAnalysis;
 
     public static class InstancePage {
         public final List<Instance> instances;
@@ -55,13 +60,180 @@ public class HeapDumpService {
         }
     }
 
+    public static class DuplicateStringStats {
+        public final String value;
+        public final long occurrenceCount;
+        public final long duplicateCount;
+        public final int stringLength;
+        public final long representativeInstanceId;
+        public final long stringShallowBytes;
+        public final int distinctBackingArrayCount;
+        public final long backingArrayShallowBytes;
+        public final long totalShallowBytes;
+
+        private DuplicateStringStats(String value, MutableDuplicateStringStats stats) {
+            this.value = value;
+            this.occurrenceCount = stats.occurrenceCount;
+            this.duplicateCount = stats.occurrenceCount - 1;
+            this.stringLength = value.length();
+            this.representativeInstanceId = stats.representativeInstanceId;
+            this.stringShallowBytes = stats.stringShallowBytes;
+            this.distinctBackingArrayCount = stats.backingArrays.size();
+            this.backingArrayShallowBytes = stats.backingArrays.values().stream()
+                    .mapToLong(Long::longValue).sum();
+            this.totalShallowBytes = stringShallowBytes + backingArrayShallowBytes;
+        }
+    }
+
+    public static class DuplicateStringsPage {
+        public final List<DuplicateStringStats> items;
+        public final long stringsScanned;
+        public final long decodingFailures;
+        public final int totalGroups;
+        public final int from;
+        public final int to;
+        public final int remaining;
+        public final int maxValueLength;
+
+        private DuplicateStringsPage(List<DuplicateStringStats> items, long stringsScanned,
+                                     long decodingFailures, int totalGroups, int from, int to,
+                                     int remaining, int maxValueLength) {
+            this.items = items;
+            this.stringsScanned = stringsScanned;
+            this.decodingFailures = decodingFailures;
+            this.totalGroups = totalGroups;
+            this.from = from;
+            this.to = to;
+            this.remaining = remaining;
+            this.maxValueLength = maxValueLength;
+        }
+    }
+
+    private static class MutableDuplicateStringStats {
+        long occurrenceCount;
+        long representativeInstanceId = Long.MAX_VALUE;
+        long stringShallowBytes;
+        final Map<Long, Long> backingArrays = new HashMap<>();
+    }
+
+    private static class DuplicateStringsAnalysis {
+        final long stringsScanned;
+        final long decodingFailures;
+        final List<DuplicateStringStats> byTotalBytes;
+        final List<DuplicateStringStats> byDuplicateCount;
+
+        DuplicateStringsAnalysis(long stringsScanned, long decodingFailures,
+                                 List<DuplicateStringStats> byTotalBytes,
+                                 List<DuplicateStringStats> byDuplicateCount) {
+            this.stringsScanned = stringsScanned;
+            this.decodingFailures = decodingFailures;
+            this.byTotalBytes = byTotalBytes;
+            this.byDuplicateCount = byDuplicateCount;
+        }
+    }
+
     public HeapSummary loadHeap(String filePath) throws IOException {
         File heapFile = new File(filePath);
         if (!heapFile.exists()) {
             throw new IOException("Heap dump file not found: " + filePath);
         }
         heap = HeapFactory.createHeap(heapFile);
+        clearHeapDerivedState();
         return heap.getSummary();
+    }
+
+    private void clearHeapDerivedState() {
+        oqlExecutor = null;
+        classesSortedByCount = null;
+        classesSortedBySize = null;
+        classesByRegexp.clear();
+        bm25Index = null;
+        bm25SearchCache.clear();
+        duplicateStringsAnalysis = null;
+    }
+
+    public DuplicateStringsPage getDuplicateStrings(String sortBy, int from, int to, int maxValueLength) {
+        if (heap == null) throw new IllegalStateException("Heap not loaded");
+        if (!"total_bytes".equals(sortBy) && !"duplicate_count".equals(sortBy)) {
+            throw new IllegalArgumentException("sort_by must be 'total_bytes' or 'duplicate_count'");
+        }
+        if (from < 0 || to < from) {
+            throw new IllegalArgumentException("Expected 0 <= from <= to");
+        }
+        if (maxValueLength < 0) {
+            throw new IllegalArgumentException("max_value_length must be non-negative");
+        }
+        if (duplicateStringsAnalysis == null) {
+            duplicateStringsAnalysis = analyzeDuplicateStrings();
+        }
+
+        List<DuplicateStringStats> sorted = "duplicate_count".equals(sortBy)
+                ? duplicateStringsAnalysis.byDuplicateCount
+                : duplicateStringsAnalysis.byTotalBytes;
+        int safeFrom = Math.min(from, sorted.size());
+        int safeTo = Math.min(to, sorted.size());
+        return new DuplicateStringsPage(
+                List.copyOf(sorted.subList(safeFrom, safeTo)),
+                duplicateStringsAnalysis.stringsScanned,
+                duplicateStringsAnalysis.decodingFailures,
+                sorted.size(), safeFrom, safeTo, sorted.size() - safeTo, maxValueLength);
+    }
+
+    private DuplicateStringsAnalysis analyzeDuplicateStrings() {
+        JavaClass stringClass = heap.getJavaClassByName("java.lang.String");
+        if (stringClass == null) {
+            return new DuplicateStringsAnalysis(0, 0, List.of(), List.of());
+        }
+
+        Map<String, MutableDuplicateStringStats> grouped = new HashMap<>();
+        long scanned = 0;
+        long failures = 0;
+        Iterator<?> iterator = stringClass.getInstancesIterator();
+        while (iterator.hasNext()) {
+            scanned++;
+            Object item = iterator.next();
+            if (!(item instanceof Instance instance)) {
+                failures++;
+                continue;
+            }
+            ValueUtil.DecodedString decoded = ValueUtil.decodeString(instance);
+            if (decoded == null) {
+                failures++;
+                continue;
+            }
+
+            MutableDuplicateStringStats stats = grouped.computeIfAbsent(
+                    decoded.value(), ignored -> new MutableDuplicateStringStats());
+            stats.occurrenceCount++;
+            stats.stringShallowBytes += instance.getSize();
+            stats.representativeInstanceId = Math.min(
+                    stats.representativeInstanceId, instance.getInstanceId());
+            PrimitiveArrayInstance backing = decoded.backingArray();
+            stats.backingArrays.putIfAbsent(backing.getInstanceId(), backing.getSize());
+        }
+
+        List<DuplicateStringStats> duplicateGroups = grouped.entrySet().stream()
+                .filter(entry -> entry.getValue().occurrenceCount >= 2)
+                .map(entry -> new DuplicateStringStats(entry.getKey(), entry.getValue()))
+                .toList();
+
+        Comparator<DuplicateStringStats> stableTail = Comparator
+                .comparing((DuplicateStringStats stats) -> stats.value)
+                .thenComparingLong(stats -> stats.representativeInstanceId);
+        Comparator<DuplicateStringStats> byTotalBytes = Comparator
+                .comparingLong((DuplicateStringStats stats) -> stats.totalShallowBytes).reversed()
+                .thenComparing(Comparator.comparingLong(
+                        (DuplicateStringStats stats) -> stats.duplicateCount).reversed())
+                .thenComparing(stableTail);
+        Comparator<DuplicateStringStats> byDuplicateCount = Comparator
+                .comparingLong((DuplicateStringStats stats) -> stats.duplicateCount).reversed()
+                .thenComparing(Comparator.comparingLong(
+                        (DuplicateStringStats stats) -> stats.totalShallowBytes).reversed())
+                .thenComparing(stableTail);
+
+        return new DuplicateStringsAnalysis(scanned, failures,
+                duplicateGroups.stream().sorted(byTotalBytes).toList(),
+                duplicateGroups.stream().sorted(byDuplicateCount).toList());
     }
 
     public List<ClassStats> getClassesByMaxInstancesCount(int from, int to) {

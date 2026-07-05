@@ -140,6 +140,16 @@ public class HeapDumpTools {
         return heapDumpService.getSummary();
     }
 
+    @Tool(name = "get_duplicate_strings", title = "Get Duplicate Strings", decription = "Returns duplicate java.lang.String values with occurrence counts and associated shallow String/backing-array footprint. Sort by total_bytes or duplicate_count.")
+    @Printer(impl = DuplicateStringsPagePrinter.class)
+    public HeapDumpService.DuplicateStringsPage getDuplicateStrings(
+            @Default(name = "sort_by", value = "total_bytes") String sortBy,
+            @Default(name = "from", value = "0") int from,
+            @Default(name = "to", value = "50") int to,
+            @Default(name = "max_value_length", value = "200") int maxValueLength) {
+        return heapDumpService.getDuplicateStrings(sortBy, from, to, maxValueLength);
+    }
+
     @Tool(name = "get_system_properties", title = "Get System Properties", decription = "Returns system properties from the heap dump.")
     @Printer(impl = PropertiesPrinter.class)
     public java.util.Properties getSystemProperties() {

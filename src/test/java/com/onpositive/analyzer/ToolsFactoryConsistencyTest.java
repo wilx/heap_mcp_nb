@@ -5,6 +5,7 @@ import com.onpositive.analyzer.mcp.reflection.Tool;
 import com.onpositive.analyzer.mcp.reflection.ToolsFactory;
 import com.onpositive.analyzer.printing.Bm25ResultListPrinter;
 import com.onpositive.analyzer.printing.ClassStatsListPrinter;
+import com.onpositive.analyzer.printing.DuplicateStringsPagePrinter;
 import com.onpositive.analyzer.printing.GCRootInfoListPrinter;
 import com.onpositive.analyzer.printing.HeapSummaryPrinter;
 import com.onpositive.analyzer.printing.InstanceListPrinter;
@@ -71,6 +72,7 @@ public class ToolsFactoryConsistencyTest {
         assertTrue(specsMap.containsKey("execute_oql"), "Should have execute_oql tool");
         assertTrue(specsMap.containsKey("analyze_heap_dump"), "Should have analyze_heap_dump tool");
         assertTrue(specsMap.containsKey("search_classes"), "Should have search_classes tool");
+        assertTrue(specsMap.containsKey("get_duplicate_strings"), "Should have get_duplicate_strings tool");
     }
 
     @Test
@@ -117,6 +119,7 @@ public class ToolsFactoryConsistencyTest {
         assertNotNull(getter.executeOqlTool());
         assertNotNull(getter.analyzeHeapTool());
         assertNotNull(getter.searchClassesTool());
+        assertNotNull(getter.getDuplicateStringsTool());
     }
 
     @Test
@@ -130,6 +133,7 @@ public class ToolsFactoryConsistencyTest {
         assertDoesNotThrow(PropertiesPrinter::new);
         assertDoesNotThrow(ReferenceInfoListPrinter::new);
         assertDoesNotThrow(Bm25ResultListPrinter::new);
+        assertDoesNotThrow(DuplicateStringsPagePrinter::new);
     }
 
     @Test

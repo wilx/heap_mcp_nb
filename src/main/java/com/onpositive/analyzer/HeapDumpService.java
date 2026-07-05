@@ -339,32 +339,37 @@ public class HeapDumpService {
     }
 
     public List<ReferenceInfo> getAllReferences(long instanceId, int from, int to) {
+        // Resolve the target instance before asking NetBeans for its incoming references.
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         Instance instance = heap.getInstanceByID(instanceId);
         if (instance == null) return new ArrayList<>();
-        
+
+        // Convert field and array-element references to their defining (referring) instances.
         Collection<?> references = instance.getReferences();
-        List<Instance> refsList = new ArrayList<>();
+        List<ReferenceInfo> result = new ArrayList<>();
         for (Object refObj : references) {
+            Instance definingInstance = null;
+            String source = null;
             if (refObj instanceof ObjectFieldValue ofv) {
-                Instance refInstance = ofv.getInstance();
-                if (refInstance != null) {
-                    refsList.add(refInstance);
-                }
+                definingInstance = ofv.getDefiningInstance();
+                source = ofv.getField() != null ? ofv.getField().getName() : null;
+            } else if (refObj instanceof ArrayItemValue arrayItem) {
+                definingInstance = arrayItem.getDefiningInstance();
+                source = "[" + arrayItem.getIndex() + "]";
+            }
+            if (definingInstance != null) {
+                result.add(new ReferenceInfo(
+                        definingInstance.getInstanceId(),
+                        getClassName(definingInstance),
+                        source
+                ));
             }
         }
-        int safeTo = Math.min(to, refsList.size());
+
+        // Apply pagination after collecting every supported kind of incoming reference.
+        int safeTo = Math.min(to, result.size());
         int safeFrom = Math.min(from, safeTo);
-        
-        List<ReferenceInfo> result = new ArrayList<>();
-        for (Instance ref : refsList.subList(safeFrom, safeTo)) {
-            result.add(new ReferenceInfo(
-                    ref.getInstanceId(),
-                    getClassName(ref),
-                    null
-            ));
-        }
-        return result;
+        return new ArrayList<>(result.subList(safeFrom, safeTo));
     }
 
     public List<JavaClass> getJavaClassesByRegExpPaginated(String regexp, int from, int to) {

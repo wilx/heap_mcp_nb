@@ -93,7 +93,7 @@ public class HeapDumpTools {
         }
     }
 
-    @Tool(name = "get_all_references", title = "Get All References", decription = "Returns all references to an instance by its ID with pagination.")
+    @Tool(name = "get_all_references", title = "Get All References", decription = "Returns incoming field and array-element references to an instance with pagination. Each result includes Via with the referring field name or array index.")
     @Printer(impl = ReferenceInfoListPrinter.class)
     public List<HeapDumpService.ReferenceInfo> getAllReferences(
             @Required("id") String id,

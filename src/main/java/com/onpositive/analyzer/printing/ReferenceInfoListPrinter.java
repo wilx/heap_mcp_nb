@@ -22,8 +22,11 @@ public class ReferenceInfoListPrinter implements IValuePrinter {
                 sb.append("Instance ID: ")
                   .append(ref.instanceId)
                   .append(", Class: ")
-                  .append(ref.className)
-                  .append("\n");
+                  .append(ref.className);
+                if (ref.fieldName != null) {
+                    sb.append(", Via: ").append(ref.fieldName);
+                }
+                sb.append("\n");
             }
         }
 

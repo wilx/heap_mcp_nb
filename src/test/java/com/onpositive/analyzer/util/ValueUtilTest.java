@@ -5,13 +5,15 @@ import org.netbeans.lib.profiler.heap.Instance;
 import org.netbeans.lib.profiler.heap.JavaClass;
 import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
 
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ValueUtilTest {
 
@@ -49,45 +51,30 @@ class ValueUtilTest {
     }
 
     private static Instance string(Map<String, Object> fields) {
-        return (Instance) Proxy.newProxyInstance(
-                ValueUtilTest.class.getClassLoader(), new Class<?>[]{Instance.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "getValueOfField" -> fields.get((String) args[0]);
-                    case "getJavaClass" -> javaClass("java.lang.String");
-                    case "getInstanceId", "getSize" -> 1L;
-                    default -> defaultValue(method.getReturnType());
-                });
+        Instance instance = mock(Instance.class);
+        JavaClass javaClass = javaClass("java.lang.String");
+        when(instance.getValueOfField(anyString()))
+                .thenAnswer(invocation -> fields.get(invocation.getArgument(0, String.class)));
+        when(instance.getJavaClass()).thenReturn(javaClass);
+        when(instance.getInstanceId()).thenReturn(1L);
+        when(instance.getSize()).thenReturn(1L);
+        return instance;
     }
 
     private static PrimitiveArrayInstance array(String className, List<?> values) {
-        return (PrimitiveArrayInstance) Proxy.newProxyInstance(
-                ValueUtilTest.class.getClassLoader(), new Class<?>[]{PrimitiveArrayInstance.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "getJavaClass" -> javaClass(className);
-                    case "getValues" -> values;
-                    case "getLength" -> values.size();
-                    case "getInstanceId", "getSize" -> 2L;
-                    default -> defaultValue(method.getReturnType());
-                });
+        PrimitiveArrayInstance array = mock(PrimitiveArrayInstance.class);
+        JavaClass javaClass = javaClass(className);
+        when(array.getJavaClass()).thenReturn(javaClass);
+        when(array.getValues()).thenReturn(values);
+        when(array.getLength()).thenReturn(values.size());
+        when(array.getInstanceId()).thenReturn(2L);
+        when(array.getSize()).thenReturn(2L);
+        return array;
     }
 
     private static JavaClass javaClass(String name) {
-        return (JavaClass) Proxy.newProxyInstance(
-                ValueUtilTest.class.getClassLoader(), new Class<?>[]{JavaClass.class},
-                (proxy, method, args) -> "getName".equals(method.getName())
-                        ? name : defaultValue(method.getReturnType()));
-    }
-
-    private static Object defaultValue(Class<?> type) {
-        if (!type.isPrimitive()) return null;
-        if (type == boolean.class) return false;
-        if (type == int.class) return 0;
-        if (type == long.class) return 0L;
-        if (type == short.class) return (short) 0;
-        if (type == byte.class) return (byte) 0;
-        if (type == char.class) return (char) 0;
-        if (type == float.class) return 0F;
-        if (type == double.class) return 0D;
-        return null;
+        JavaClass javaClass = mock(JavaClass.class);
+        when(javaClass.getName()).thenReturn(name);
+        return javaClass;
     }
 }

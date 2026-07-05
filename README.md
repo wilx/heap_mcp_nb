@@ -53,7 +53,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 | `get_instance_by_id` | Get instance details including field values and object references |
 | `get_instance_retained_size` | Compute retained size of an instance by ID (separate from `get_instance_by_id` since retained size computation is costly and may fail) |
 | `get_biggest_objects` | Find largest objects by retained size |
-| `get_all_references` | Get all references to an instance with pagination |
+| `get_all_references` | Get incoming field and array-element references to an instance, including the referring object and field name or array index (paginated) |
 | `get_gc_roots` | View GC root references with pagination (defaults 0-50) |
 | `get_gc_roots_paginated` | View GC roots with pagination, including kind and instance info |
 | `get_system_properties` | Access JVM system properties captured in the heap dump |
@@ -62,7 +62,7 @@ A Model Context Protocol (MCP) server for analyzing Java heap dump files (.hprof
 
 ## Requirements
 
-- Java 17 or higher
+- Java 21 or higher
 - Maven 3.6+
 
 ## Installing
@@ -156,6 +156,16 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 
 Most tools return results as newline-separated text. For example:
 
+```text
+get_all_references:
+Instance ID: 101, Class: example.Owner, Via: payload
+Instance ID: 202, Class: java.lang.Object[], Via: [7]
+```
+
+`Via` identifies the field or array element containing the incoming reference.
+
+For class details:
+
 ```
 get_class_by_name:
 Name: java.util.HashMap
@@ -190,11 +200,15 @@ See `src/main/java/com/onpositive/analyzer/mcp/reflection/` for annotation defin
 
 ## Dependencies
 
-- **io.modelcontextprotocol.sdk:mcp** (1.1.2) - MCP Java SDK
-- **org.netbeans.modules:org-netbeans-lib-profiler** (RELEASE200) - Heap analysis
-- **org.netbeans.modules:org-netbeans-modules-profiler-oql** (RELEASE200) - OQL engine
-- **org.openjdk.nashorn:nashorn-core** (15.4) - JavaScript engine for OQL
-- **JUnit 5** - Testing framework
+- **io.modelcontextprotocol.sdk:mcp** (1.1.3) - MCP Java SDK
+- **org.netbeans.modules:org-netbeans-lib-profiler** (RELEASE300) - Heap analysis
+- **org.netbeans.modules:org-netbeans-modules-profiler-oql** (RELEASE300) - OQL engine
+- **org.openjdk.nashorn:nashorn-core** (15.7) - JavaScript engine for OQL
+- **com.carrotsearch:hppc** (0.10.0) - Memory-efficient primitive collections
+- **org.apache.commons:commons-lang3** (3.20.0) - General utilities
+- **org.slf4j:slf4j-simple** (2.0.17) - Logging implementation
+- **JUnit Jupiter** (5.13.4) - Testing framework
+- **org.mockito:mockito-core** (5.23.0) - Test mocks
 
 ## License
 

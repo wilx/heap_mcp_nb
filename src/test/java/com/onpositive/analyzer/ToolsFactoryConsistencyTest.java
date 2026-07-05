@@ -166,11 +166,12 @@ public class ToolsFactoryConsistencyTest {
     void testReferenceInfoListPrinter() {
         ReferenceInfoListPrinter printer = new ReferenceInfoListPrinter();
         List<HeapDumpService.ReferenceInfo> refs = List.of(
-                new HeapDumpService.ReferenceInfo(456L, "ReferencedClass", "fieldName")
+                new HeapDumpService.ReferenceInfo(456L, "ReferencedClass", "fieldName"),
+                new HeapDumpService.ReferenceInfo(789L, "java.lang.Object[]", "[7]")
         );
         String result = printer.print(refs);
-        assertTrue(result.contains("456"));
-        assertTrue(result.contains("ReferencedClass"));
+        assertTrue(result.contains("Instance ID: 456, Class: ReferencedClass, Via: fieldName"));
+        assertTrue(result.contains("Instance ID: 789, Class: java.lang.Object[], Via: [7]"));
     }
 
     @Test

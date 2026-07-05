@@ -269,6 +269,8 @@ public class HeapDumpService {
     public List<RetainedInstance> getBiggestObjectsByRetainedSize(int limit) {
         validateNonNegative("limit", limit);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
+        // NetBeans can throw here for heaps with null GC-root instances; MCP callers receive it as an error result.
+        // https://github.com/apache/netbeans/issues/6357
         List<?> biggestObjects = heap.getBiggestObjectsByRetainedSize(limit);
         List<RetainedInstance> result = new ArrayList<>();
         for (Object object : biggestObjects) {

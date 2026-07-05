@@ -27,13 +27,12 @@ class DuplicateStringsServiceTest {
         assertFalse(byCount.items.isEmpty());
         assertEquals(byCount.totalGroups, byBytes.totalGroups);
         for (int i = 1; i < byCount.items.size(); i++) {
-            assertTrue(byCount.items.get(i - 1).duplicateCount >= byCount.items.get(i).duplicateCount);
+            assertTrue(byCount.items.get(i - 1).occurrenceCount >= byCount.items.get(i).occurrenceCount);
         }
         for (int i = 1; i < byBytes.items.size(); i++) {
             assertTrue(byBytes.items.get(i - 1).totalShallowBytes >= byBytes.items.get(i).totalShallowBytes);
         }
         for (HeapDumpService.DuplicateStringStats stats : byCount.items) {
-            assertEquals(stats.occurrenceCount - 1, stats.duplicateCount);
             assertEquals(stats.stringShallowBytes + stats.backingArrayShallowBytes,
                     stats.totalShallowBytes);
             assertTrue(stats.distinctBackingArrayCount >= 1);

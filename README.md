@@ -156,7 +156,7 @@ In tools like Trae, opencode, or Qwen CLI you can point to a .hprof file and ask
 
 ### Tool Response Format
 
-Most typed tools return structured MCP content and advertise JSON output schemas. For example, `get_duplicate_strings` returns an object with fields such as `items`, `totalGroups`, `stringsScanned`, `decodingFailures`, and pagination metadata. Each `items` entry includes fields such as `value`, `occurrenceCount`, `duplicateCount`, `representativeInstanceId`, and shallow-byte totals.
+Most typed tools return structured MCP content and advertise JSON output schemas. For example, `get_duplicate_strings` returns an object with fields such as `items`, `totalGroups`, `stringsScanned`, `decodingFailures`, and pagination metadata. Each `items` entry includes fields such as `value`, `occurrenceCount`, `representativeInstanceId`, and shallow-byte totals.
 
 `execute_oql` returns structured rows with fields such as `kind`, `displayValue`, `instanceId`, `className`, `arrayLength`, and `arrayPreview`, depending on whether the row is a scalar value, heap instance, string, or primitive array.
 

@@ -83,8 +83,6 @@ public class HeapDumpService {
         public final String value;
         @Schema(description = "Number of java.lang.String instances that have this value.")
         public final long occurrenceCount;
-        @Schema(description = "Number of redundant instances beyond the first occurrence.")
-        public final long duplicateCount;
         @Schema(description = "Length of the original string value in UTF-16 code units.")
         public final int stringLength;
         @Schema(description = "Instance ID of a representative java.lang.String for this value group.")
@@ -102,7 +100,6 @@ public class HeapDumpService {
         private DuplicateStringStats(String value, MutableDuplicateStringStats stats) {
             this.value = value;
             this.occurrenceCount = stats.occurrenceCount;
-            this.duplicateCount = stats.occurrenceCount - 1;
             this.stringLength = value.length();
             this.representativeInstanceId = stats.representativeInstanceId;
             this.stringShallowBytes = stats.stringShallowBytes;
@@ -348,10 +345,10 @@ public class HeapDumpService {
         Comparator<DuplicateStringStats> byTotalBytes = Comparator
                 .comparingLong((DuplicateStringStats stats) -> stats.totalShallowBytes).reversed()
                 .thenComparing(Comparator.comparingLong(
-                        (DuplicateStringStats stats) -> stats.duplicateCount).reversed())
+                        (DuplicateStringStats stats) -> stats.occurrenceCount).reversed())
                 .thenComparing(stableTail);
         Comparator<DuplicateStringStats> byDuplicateCount = Comparator
-                .comparingLong((DuplicateStringStats stats) -> stats.duplicateCount).reversed()
+                .comparingLong((DuplicateStringStats stats) -> stats.occurrenceCount).reversed()
                 .thenComparing(Comparator.comparingLong(
                         (DuplicateStringStats stats) -> stats.totalShallowBytes).reversed())
                 .thenComparing(stableTail);

@@ -288,7 +288,7 @@ public class HeapDumpMcpTest {
     }
 
     @Test
-    @Disabled("Disable due to NullPointerException in HprofGCRoot.getGCRoot()")
+    @Disabled("HeapDumpSample.hprof triggers upstream NetBeans HprofGCRoot.getGCRoot() NullPointerException while computing retained sizes; covered by HeapDumpServiceBiggestObjectsTest")
     void testGetBiggestObjectsAfterLoad() {
         McpSchema.CallToolRequest loadRequest = new McpSchema.CallToolRequest("load_heap", Map.of("file_path", samplePath));
         toolsGetter.loadHeapTool().callHandler().apply(null, loadRequest);

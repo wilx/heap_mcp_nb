@@ -63,6 +63,9 @@ public class HeapDumpService {
         }
     }
 
+    public record RetainedInstance(Instance instance, Long retainedSize, String retainedSizeError) {
+    }
+
     public static class DuplicateStringStats {
         public final String value;
         public final long occurrenceCount;
@@ -265,9 +268,25 @@ public class HeapDumpService {
         return classesSortedBySize.subList(safeFrom, safeTo);
     }
 
-    public List<Instance> getBiggestObjectsByRetainedSize(int limit) {
+    public List<RetainedInstance> getBiggestObjectsByRetainedSize(int limit) {
         if (heap == null) throw new IllegalStateException("Heap not loaded");
-        return heap.getBiggestObjectsByRetainedSize(limit);
+        List<?> biggestObjects = heap.getBiggestObjectsByRetainedSize(limit);
+        List<RetainedInstance> result = new ArrayList<>();
+        for (Object object : biggestObjects) {
+            if (!(object instanceof Instance instance)) {
+                throw new IllegalStateException("Heap returned a non-instance biggest object: " + object);
+            }
+            try {
+                result.add(new RetainedInstance(instance, instance.getRetainedSize(), null));
+            } catch (RuntimeException e) {
+                String message = e.getMessage();
+                if (message == null || message.isEmpty()) {
+                    message = e.getClass().getSimpleName();
+                }
+                result.add(new RetainedInstance(instance, null, message));
+            }
+        }
+        return result;
     }
 
     public static class GCRootInfo {

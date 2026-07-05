@@ -45,7 +45,7 @@ public class HeapDumpTools {
 
     @Tool(name = "get_biggest_objects", title = "Get Biggest Objects", decription = "Returns the biggest objects by retained size.")
     @Printer(impl = InstanceListPrinter.class)
-    public List<Instance> getBiggestObjects(@Required("limit") int limit) {
+    public List<HeapDumpService.RetainedInstance> getBiggestObjects(@Required("limit") int limit) {
         return heapDumpService.getBiggestObjectsByRetainedSize(limit);
     }
 

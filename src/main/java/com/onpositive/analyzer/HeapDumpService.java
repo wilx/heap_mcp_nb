@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.netbeans.lib.profiler.heap.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 
 import static com.onpositive.analyzer.util.ClassUtil.getClassName;
 
+@Service
 public class HeapDumpService {
     private static final Logger LOGGER = LoggerFactory.getLogger(HeapDumpService.class);
 

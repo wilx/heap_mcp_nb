@@ -444,7 +444,7 @@ public class HeapDumpService {
             buildBm25Index();
         }
 
-        String cacheKey = query + "|" + topN;
+        String cacheKey = query + "|" + topN + "|" + from;
         List<Bm25Result> fullResults = bm25SearchCache.get(cacheKey);
         if (fullResults == null) {
             fullResults = bm25Index.search(query, Math.max(topN + from, topN));

@@ -20,6 +20,10 @@ public final class InstanceFieldValues {
     }
 
     public static List<InstanceFieldValue> from(Instance instance) {
+        return from(instance, ValueUtil.defaultUtf16ByteOrder());
+    }
+
+    public static List<InstanceFieldValue> from(Instance instance, ValueUtil.Utf16ByteOrder utf16ByteOrder) {
         List<?> rawFieldValues = instance.getFieldValues();
         if (rawFieldValues == null || rawFieldValues.isEmpty()) {
             return List.of();
@@ -28,7 +32,7 @@ public final class InstanceFieldValues {
         List<InstanceFieldValue> values = new ArrayList<>(rawFieldValues.size());
         for (Object rawFieldValue : rawFieldValues) {
             if (rawFieldValue instanceof org.netbeans.lib.profiler.heap.FieldValue fieldValue) {
-                values.add(from(fieldValue));
+                values.add(from(fieldValue, utf16ByteOrder));
             }
         }
         return values;
@@ -46,7 +50,8 @@ public final class InstanceFieldValues {
         return preview;
     }
 
-    private static InstanceFieldValue from(org.netbeans.lib.profiler.heap.FieldValue fieldValue) {
+    private static InstanceFieldValue from(org.netbeans.lib.profiler.heap.FieldValue fieldValue,
+                                           ValueUtil.Utf16ByteOrder utf16ByteOrder) {
         Field field = fieldValue.getField();
         String fieldName = field != null && field.getName() != null ? field.getName() : "";
         String declaredType = field != null && field.getType() != null && field.getType().getName() != null
@@ -62,7 +67,7 @@ public final class InstanceFieldValues {
 
             String className = ClassUtil.getClassName(referencedInstance);
             if ("java.lang.String".equals(className)) {
-                String value = ValueUtil.fastExtractStringValue(referencedInstance);
+                String value = ValueUtil.fastExtractStringValue(referencedInstance, utf16ByteOrder);
                 String returnedValue = value;
                 boolean truncated = value != null && value.length() > MAX_STRING_LENGTH;
                 if (truncated) {

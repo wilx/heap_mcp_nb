@@ -69,7 +69,9 @@ public class HeapDumpTools {
     @McpTool(name = "get_instance_by_id", title = "Get Instance By ID", description = "Returns instance details by its internal ID, including class, shallow size, and field values.", generateOutputSchema = true)
     public McpDtos.InstanceDto getInstanceById(
         @McpToolParam(required = true, description = "Internal instance ID, decimal or hexadecimal.") String id) {
-        return McpDtos.InstanceDto.from(heapDumpService.getInstanceById(parseId(id)));
+        return McpDtos.InstanceDto.from(
+            heapDumpService.getInstanceById(parseId(id)),
+            heapDumpService.getUtf16ByteOrder());
     }
 
     @McpTool(name = "get_instance_retained_size", title = "Get Instance Retained Size", description = "Returns the retained size of an instance by its ID. Computing retained size can be costly and may fail for complex heap graphs.", generateOutputSchema = true)

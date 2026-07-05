@@ -1,17 +1,24 @@
 package com.onpositive.analyzer.util;
 
+import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.Instance;
+import org.netbeans.lib.profiler.heap.JavaClass;
 import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class ValueUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(ValueUtil.class);
+    private static final Utf16ByteOrder DEFAULT_UTF16_BYTE_ORDER = runningJvmUtf16ByteOrder();
 
     public record DecodedString(String value, PrimitiveArrayInstance backingArray) {
+    }
+
+    public record Utf16ByteOrder(int hiByteShift, int loByteShift) {
     }
 
     public static String fastExtractStringValue(Instance stringInstance) {
@@ -19,11 +26,27 @@ public class ValueUtil {
         return decoded != null ? decoded.value() : null;
     }
 
+    public static String fastExtractStringValue(Instance stringInstance, Utf16ByteOrder utf16ByteOrder) {
+        DecodedString decoded = decodeString(stringInstance, utf16ByteOrder);
+        return decoded != null ? decoded.value() : null;
+    }
+
+    public static Utf16ByteOrder defaultUtf16ByteOrder() {
+        return DEFAULT_UTF16_BYTE_ORDER;
+    }
+
     /**
      * Decodes the common java.lang.String layouts found in heap dumps.
      * Returns {@code null} when the instance does not expose a supported layout.
      */
     public static DecodedString decodeString(Instance stringInstance) {
+        return decodeString(stringInstance, DEFAULT_UTF16_BYTE_ORDER);
+    }
+
+    public static DecodedString decodeString(Instance stringInstance, Utf16ByteOrder utf16ByteOrder) {
+        if (utf16ByteOrder == null) {
+            utf16ByteOrder = DEFAULT_UTF16_BYTE_ORDER;
+        }
         if (stringInstance == null) return null;
         Object valueField = stringInstance.getValueOfField("value");
         // Some heap dumps contain java.lang.String instances whose value field is a
@@ -75,7 +98,8 @@ public class ValueUtil {
                     if ((bytes.length & 1) != 0) return null;
                     StringBuilder sb = new StringBuilder(bytes.length / 2);
                     for (int i = 0; i < bytes.length; i += 2) {
-                        char c = (char) (((bytes[i] & 0xFF) << 8) | (bytes[i + 1] & 0xFF));
+                        char c = (char) (((bytes[i] & 0xFF) << utf16ByteOrder.hiByteShift())
+                                | ((bytes[i + 1] & 0xFF) << utf16ByteOrder.loByteShift()));
                         sb.append(c);
                     }
                     return new DecodedString(sb.toString(), array);
@@ -90,6 +114,34 @@ public class ValueUtil {
             return null;
         }
         return null;
+    }
+
+    public static Utf16ByteOrder utf16ByteOrder(Heap heap) {
+        if (heap == null) {
+            return DEFAULT_UTF16_BYTE_ORDER;
+        }
+        try {
+            JavaClass utf16Class = heap.getJavaClassByName("java.lang.StringUTF16");
+            if (utf16Class == null) {
+                return DEFAULT_UTF16_BYTE_ORDER;
+            }
+            Object hiByteShift = utf16Class.getValueOfStaticField("HI_BYTE_SHIFT");
+            Object loByteShift = utf16Class.getValueOfStaticField("LO_BYTE_SHIFT");
+            if (hiByteShift instanceof Number hi && loByteShift instanceof Number lo) {
+                return new Utf16ByteOrder(hi.intValue(), lo.intValue());
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.debug("Cannot resolve java.lang.StringUTF16 byte order from heap", ex);
+            return DEFAULT_UTF16_BYTE_ORDER;
+        }
+        return DEFAULT_UTF16_BYTE_ORDER;
+    }
+
+    private static Utf16ByteOrder runningJvmUtf16ByteOrder() {
+        if (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN) {
+            return new Utf16ByteOrder(8, 0);
+        }
+        return new Utf16ByteOrder(0, 8);
     }
 
     private static int intField(Instance instance, String name, int defaultValue) {

@@ -3,6 +3,7 @@ package com.onpositive.analyzer.mcp;
 import com.onpositive.analyzer.HeapDumpService;
 import com.onpositive.analyzer.InstanceFieldValues;
 import com.onpositive.analyzer.util.ClassUtil;
+import com.onpositive.analyzer.util.ValueUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.netbeans.lib.profiler.heap.HeapSummary;
 import org.netbeans.lib.profiler.heap.Instance;
@@ -102,6 +103,10 @@ public final class McpDtos {
             List<InstanceFieldValues.InstanceFieldValue> fields) {
 
         static InstanceDto from(Instance instance) {
+            return from(instance, ValueUtil.defaultUtf16ByteOrder());
+        }
+
+        static InstanceDto from(Instance instance, ValueUtil.Utf16ByteOrder utf16ByteOrder) {
             if (instance == null) {
                 return null;
             }
@@ -111,7 +116,7 @@ public final class McpDtos {
                     ClassUtil.getClassName(instance),
                     instance.getSize(),
                     instance.isGCRoot(),
-                    InstanceFieldValues.from(instance));
+                    InstanceFieldValues.from(instance, utf16ByteOrder));
         }
 
         static InstanceDto summary(Instance instance) {

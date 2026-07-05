@@ -14,10 +14,12 @@ import java.util.List;
 public class OqlQueryExecutor {
 
     private final Heap heap;
+    private final ValueUtil.Utf16ByteOrder utf16ByteOrder;
     private OQLEngine oqlEngine;
 
     public OqlQueryExecutor(Heap heap) {
         this.heap = heap;
+        this.utf16ByteOrder = ValueUtil.utf16ByteOrder(heap);
     }
 
     public OqlResult executeOql(String query, int maxResults) throws Exception {
@@ -53,7 +55,7 @@ public class OqlQueryExecutor {
         return new OqlResult(rows, rows.size(), maxResults, truncated[0]);
     }
 
-    private static OqlRow toRow(int index, Object value) {
+    private OqlRow toRow(int index, Object value) {
         if (value == null) {
             return new OqlRow(index, "null", "", "null", -1L, "", -1L, false, -1, List.of(), List.of());
         }
@@ -67,11 +69,11 @@ public class OqlQueryExecutor {
             String className = ClassUtil.getClassName(instance);
             String kind = "java.lang.String".equals(className) ? "string" : "instance";
             String displayValue = "java.lang.String".equals(className)
-                    ? String.valueOf(ValueUtil.fastExtractStringValue(instance))
+                    ? String.valueOf(ValueUtil.fastExtractStringValue(instance, utf16ByteOrder))
                     : className;
             List<InstanceFieldValues.InstanceFieldValue> fields = "java.lang.String".equals(className)
                     ? List.of()
-                    : InstanceFieldValues.from(instance);
+                    : InstanceFieldValues.from(instance, utf16ByteOrder);
             return new OqlRow(index, kind, className, displayValue, instance.getInstanceId(), className,
                     instance.getSize(), safeIsGCRoot(instance), -1, List.of(), fields);
         }
@@ -135,6 +137,8 @@ public class OqlQueryExecutor {
 
             String jsPatch =
                 "var FastStr = Java.type(\"com.onpositive.analyzer.util.ValueUtil\");" +
+                "var Utf16ByteOrder = Java.type(\"com.onpositive.analyzer.util.ValueUtil$Utf16ByteOrder\");" +
+                "var utf16ByteOrder = new Utf16ByteOrder(" + utf16ByteOrder.hiByteShift() + "," + utf16ByteOrder.loByteShift() + ");" +
                 "JavaObjectWrapper = function(instance) {" +
                 "  var things = instance.fieldValues;" +
                 "  var fldValueCache = new Array();" +
@@ -163,7 +167,7 @@ public class OqlQueryExecutor {
                 "    }," +
                 "    __call__: function(name) {" +
                 "      if (name == 'toString') {" +
-                "        if (instance.javaClass.name == 'java.lang.String') { return FastStr.fastExtractStringValue(instance); }" +
+                "        if (instance.javaClass.name == 'java.lang.String') { return FastStr.fastExtractStringValue(instance, utf16ByteOrder); }" +
                 "        return instance.toString();" +
                 "      } else { return undefined; }" +
                 "    }" +

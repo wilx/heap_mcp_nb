@@ -306,6 +306,7 @@ public class HeapDumpService {
             return new DuplicateStringsAnalysis(0, 0, List.of(), List.of(), Map.of());
         }
 
+        ValueUtil.Utf16ByteOrder utf16ByteOrder = ValueUtil.utf16ByteOrder(heap);
         Map<String, MutableDuplicateStringStats> grouped = new HashMap<>();
         long scanned = 0;
         long failures = 0;
@@ -317,7 +318,7 @@ public class HeapDumpService {
                 failures++;
                 continue;
             }
-            ValueUtil.DecodedString decoded = ValueUtil.decodeString(instance);
+            ValueUtil.DecodedString decoded = ValueUtil.decodeString(instance, utf16ByteOrder);
             if (decoded == null) {
                 failures++;
                 continue;
@@ -590,6 +591,11 @@ public class HeapDumpService {
     public Properties getSystemProperties() {
         if (heap == null) throw new IllegalStateException("Heap not loaded");
         return heap.getSystemProperties();
+    }
+
+    public ValueUtil.Utf16ByteOrder getUtf16ByteOrder() {
+        if (heap == null) throw new IllegalStateException("Heap not loaded");
+        return ValueUtil.utf16ByteOrder(heap);
     }
 
     public List<ClassStats> getTopClasses(String filePath, int limit) throws IOException {

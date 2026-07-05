@@ -1,10 +1,12 @@
 package com.onpositive.analyzer.util;
 
 import org.junit.jupiter.api.Test;
+import org.netbeans.lib.profiler.heap.Heap;
 import org.netbeans.lib.profiler.heap.Instance;
 import org.netbeans.lib.profiler.heap.JavaClass;
 import org.netbeans.lib.profiler.heap.PrimitiveArrayInstance;
 
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 
@@ -33,12 +35,42 @@ class ValueUtilTest {
         Instance latin1 = string(Map.of(
                 "value", array("byte[]", List.of((byte) 'h', (byte) 'i')),
                 "coder", (byte) 0));
+        ValueUtil.Utf16ByteOrder defaultByteOrder = ValueUtil.defaultUtf16ByteOrder();
         Instance utf16 = string(Map.of(
-                "value", array("byte[]", List.of((byte) 0, (byte) 'A', (byte) 1, (byte) 0)),
+                "value", array("byte[]", List.of(
+                        utf16Byte('A', defaultByteOrder.hiByteShift()),
+                        utf16Byte('A', defaultByteOrder.loByteShift()),
+                        utf16Byte('\u0100', defaultByteOrder.hiByteShift()),
+                        utf16Byte('\u0100', defaultByteOrder.loByteShift()))),
                 "coder", (byte) 1));
 
         assertEquals("hi", ValueUtil.fastExtractStringValue(latin1));
         assertEquals("A\u0100", ValueUtil.fastExtractStringValue(utf16));
+    }
+
+    @Test
+    void decodesCompactUtf16UsingDumpedHeapByteOrder() {
+        JavaClass utf16Class = javaClass("java.lang.StringUTF16");
+        when(utf16Class.getValueOfStaticField("HI_BYTE_SHIFT")).thenReturn(0);
+        when(utf16Class.getValueOfStaticField("LO_BYTE_SHIFT")).thenReturn(8);
+        Heap heap = mock(Heap.class);
+        when(heap.getJavaClassByName("java.lang.StringUTF16")).thenReturn(utf16Class);
+        Instance utf16 = string(Map.of(
+                "value", array("byte[]", List.of((byte) 'A', (byte) 0, (byte) 0, (byte) 1)),
+                "coder", (byte) 1));
+
+        ValueUtil.Utf16ByteOrder byteOrder = ValueUtil.utf16ByteOrder(heap);
+
+        assertEquals("A\u0100", ValueUtil.fastExtractStringValue(utf16, byteOrder));
+    }
+
+    @Test
+    void defaultUtf16ByteOrderMatchesRunningJvmNativeOrder() {
+        ValueUtil.Utf16ByteOrder expected = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN
+                ? new ValueUtil.Utf16ByteOrder(8, 0)
+                : new ValueUtil.Utf16ByteOrder(0, 8);
+
+        assertEquals(expected, ValueUtil.defaultUtf16ByteOrder());
     }
 
     @Test
@@ -76,5 +108,9 @@ class ValueUtilTest {
         JavaClass javaClass = mock(JavaClass.class);
         when(javaClass.getName()).thenReturn(name);
         return javaClass;
+    }
+
+    private static byte utf16Byte(char c, int shift) {
+        return (byte) (c >> shift);
     }
 }

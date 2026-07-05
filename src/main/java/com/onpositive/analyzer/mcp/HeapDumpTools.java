@@ -77,7 +77,7 @@ public class HeapDumpTools {
         return heapDumpService.getJavaClassById(parseId(id));
     }
 
-    @Tool(name = "get_instance_by_id", title = "Get Instance By ID", decription = "Returns instance details by its internal ID, including class, size, retained size, and field values.")
+    @Tool(name = "get_instance_by_id", title = "Get Instance By ID", decription = "Returns instance details by its internal ID, including class, shallow size, and field values.")
     @Printer(impl = InstancePrinter.class)
     public Instance getInstanceById(@Required("id") String id) {
         return heapDumpService.getInstanceById(parseId(id));

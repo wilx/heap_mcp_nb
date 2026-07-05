@@ -19,36 +19,35 @@ public class InstancePrinter implements IValuePrinter {
         }
 
         String className = ClassUtil.getClassName(instance);
+        StringBuilder sb = new StringBuilder();
+        appendHeader(sb, instance, className);
         if ("java.lang.String".equals(className)) {
-             return ValueUtil.fastExtractStringValue(instance);
+            sb.append(String.format("Value: %s%n", ValueUtil.fastExtractStringValue(instance)));
+            return sb.toString();
         }
         if (object instanceof PrimitiveArrayInstance arrayInstance) {
-            StringBuilder resultBuilder = new StringBuilder();
-            resultBuilder.append("Array:").append(className).append(" values:[");
+            sb.append("Array:").append(className).append("\n");
+            sb.append(String.format("Length: %d%n", arrayInstance.getLength()));
+            sb.append("Values: [");
             boolean addEllipsis = arrayInstance.getLength() > MAX_ARRAY_ITEMS;
-            int to = Math.min(100, arrayInstance.getLength());
+            int to = Math.min(MAX_ARRAY_ITEMS, arrayInstance.getLength());
             List values = arrayInstance.getValues();
             for (int i = 0; i < to; i++) {
-                resultBuilder.append(values.get(i).toString());
+                sb.append(values.get(i).toString());
                 if (i < to - 1) {
-                    resultBuilder.append(",");
+                    sb.append(",");
                 }
             }
             if (addEllipsis) {
-                resultBuilder.append("...");
+                sb.append("...");
             }
-            resultBuilder.append("]\n");
-            return resultBuilder.toString();
+            sb.append("]\n");
+            return sb.toString();
         }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("Instance ID: %d%n", instance.getInstanceId()));
-        sb.append(String.format("Class: %s%n", className));
-        sb.append(String.format("Size: %d%n", instance.getSize()));
 
         List<?> fieldValues = instance.getFieldValues();
         if (fieldValues != null && !fieldValues.isEmpty()) {
-            sb.append("Fields:%n");
+            sb.append(String.format("Fields:%n"));
             for (Object fvObj : fieldValues) {
                 FieldValue fv = (FieldValue) fvObj;
                 String fieldName = fv.getField().getName();
@@ -60,6 +59,12 @@ public class InstancePrinter implements IValuePrinter {
         }
 
         return sb.toString();
+    }
+
+    private void appendHeader(StringBuilder sb, Instance instance, String className) {
+        sb.append(String.format("Instance ID: %d%n", instance.getInstanceId()));
+        sb.append(String.format("Class: %s%n", className));
+        sb.append(String.format("Shallow Size: %d%n", instance.getSize()));
     }
 
 }

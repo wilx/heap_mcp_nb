@@ -555,11 +555,8 @@ public class HeapDumpService {
     public List<JavaClass> getJavaClassesByRegExpPaginated(String regexp, int from, int to) {
         validateRange(from, to);
         if (heap == null) throw new IllegalStateException("Heap not loaded");
-        List<JavaClass> classesList = classesByRegexp.getIfPresent(regexp);
-        if (classesList == null) {
-            classesList = new ArrayList<>(heap.getJavaClassesByRegExp(regexp));
-            classesByRegexp.put(regexp, classesList);
-        }
+        List<JavaClass> classesList = classesByRegexp.get(regexp,
+            re -> new ArrayList<>(heap.getJavaClassesByRegExp(re)));
         int safeTo = Math.min(to, classesList.size());
         int safeFrom = Math.min(from, safeTo);
         return classesList.subList(safeFrom, safeTo);

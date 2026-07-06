@@ -9,6 +9,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Properties;
 
 @Component
 public class HeapDumpTools {
@@ -151,7 +152,7 @@ public class HeapDumpTools {
     }
 
     @McpTool(name = "get_system_properties", title = "Get System Properties", description = "Returns system properties from the heap dump.", generateOutputSchema = true)
-    public java.util.Properties getSystemProperties() {
+    public Properties getSystemProperties() {
         return heapDumpService.getSystemProperties();
     }
 

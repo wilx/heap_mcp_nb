@@ -179,7 +179,7 @@ public class HeapDumpTools {
         StringBuilder sb = new StringBuilder();
         sb.append("Top ").append(stats.size()).append(" Classes in Heap Dump:\n");
         sb.append(String.format("%-50s | %-10s | %-10s%n", "Class Name", "Count", "Size"));
-        sb.append("-".repeat(75)).append("\n");
+        sb.repeat("-", 75).append("\n");
         for (HeapDumpService.ClassStats stat : stats) {
             sb.append(String.format("%-50s | %-10d | %-10d%n",
                 truncate(stat.className, 50), stat.instanceCount, stat.size));
